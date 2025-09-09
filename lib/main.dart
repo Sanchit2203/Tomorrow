@@ -56,7 +56,6 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState!.validate()) {
       // Process login
       String username = _usernameController.text;
-      String password = _passwordController.text;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Logging in with $username... (not implemented)')),
       );
