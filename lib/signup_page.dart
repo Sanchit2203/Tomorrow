@@ -27,10 +27,7 @@ class _SignupPageState extends State<SignupPage> {
   void _signup() {
     if (_formKey.currentState!.validate()) {
       // Process signup
-      String email = _emailController.text;
-      String fullName = _fullNameController.text;
       String username = _usernameController.text;
-      String password = _passwordController.text;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Signing up with $username... (not implemented)')),
       );
