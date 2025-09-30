@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1001281655977",
+    "project_id": "tomorrow-6e538",
+    "storage_bucket": "tomorrow-6e538.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1001281655977:android:edf3cdb87bf7ffa75c45b8",
+        "android_client_info": {
+          "package_name": "com.tomorrow.tomorrow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8SQOe0CFym9ju2WHi34xB-RkkOZfGaQE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
