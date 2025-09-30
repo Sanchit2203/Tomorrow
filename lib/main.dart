@@ -233,7 +233,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                 ],
                               ),
                               child: const Icon(
-                                Icons.rocket_launch_rounded,
+                                Icons.punch_clock_rounded,
                                 size: 40,
                                 color: Colors.white,
                               ),
@@ -251,15 +251,6 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                                   color: Colors.white,
                                   letterSpacing: -0.5,
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Your future starts here',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white.withOpacity(0.8),
-                                fontWeight: FontWeight.w300,
                               ),
                             ),
                           ],
