@@ -5,6 +5,7 @@ import 'package:tomorrow/search_screen.dart';
 import 'package:tomorrow/add_post_screen.dart';
 import 'package:tomorrow/reels_screen.dart';
 import 'package:tomorrow/profile_screen.dart';
+import 'package:tomorrow/services/auth_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -18,6 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   late AnimationController _appBarController;
   late Animation<double> _appBarAnimation;
   late PageController _pageController;
+  final AuthService _authService = AuthService();
 
   static const List<Widget> _widgetOptions = <Widget>[
     HomeFeedScreen(),
@@ -178,6 +180,14 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                           onPressed: () {
                             HapticFeedback.lightImpact();
                             _showMessagesBottomSheet(context);
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _buildIconButton(
+                          icon: Icons.logout_rounded,
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            _showLogoutDialog(context);
                           },
                         ),
                       ],
@@ -478,6 +488,85 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ],
         ),
       ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.logout_rounded,
+                color: const Color(0xFF6C5CE7),
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Sign Out',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to sign out?',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                try {
+                  await _authService.signOut();
+                  // The AuthWrapper will automatically handle the navigation
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error signing out: ${e.toString()}'),
+                        backgroundColor: const Color(0xFFFF4444),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C5CE7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Sign Out',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

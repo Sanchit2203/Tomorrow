@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:tomorrow/signup_page.dart'; // Added import for signup_page.dart
 import 'package:tomorrow/dashboard_screen.dart'; // Import the new dashboard screen
+import 'package:tomorrow/services/auth_service.dart';
+import 'package:tomorrow/auth_wrapper.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
@@ -58,7 +66,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const LoginPage(),
+      home: const AuthWrapper(),
       routes: {
         '/signup': (context) => const SignupPage(),
         '/dashboard': (context) => const DashboardScreen(),
@@ -78,6 +86,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   
@@ -129,25 +138,147 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       // Haptic feedback
       HapticFeedback.mediumImpact();
       
-      // Simulate login delay
-      await Future.delayed(const Duration(milliseconds: 1500));
+      try {
+        // Authenticate with Firebase
+        final userCredential = await _authService.signInWithEmailAndPassword(
+          email: _usernameController.text.trim(),
+          password: _passwordController.text,
+        );
+        
+        if (userCredential != null && userCredential.user != null) {
+          setState(() {
+            _isLoading = false;
+          });
+          
+          // Show success message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Welcome back, ${userCredential.user!.email}! 🎉'),
+                backgroundColor: const Color(0xFF00C851),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+            
+            // Navigate to DashboardScreen after successful login
+            Navigator.pushReplacementNamed(context, '/dashboard');
+          }
+        }
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceFirst('Exception: ', '')),
+              backgroundColor: const Color(0xFFFF4444),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    // Haptic feedback
+    HapticFeedback.mediumImpact();
+    
+    try {
+      final userCredential = await _authService.signInWithGoogle();
       
+      if (userCredential != null && userCredential.user != null) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Welcome, ${userCredential.user!.displayName ?? userCredential.user!.email}! 🎉'),
+              backgroundColor: const Color(0xFF00C851),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+          
+          // Navigate to DashboardScreen after successful login
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
       setState(() {
         _isLoading = false;
       });
       
-      String username = _usernameController.text;
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: const Color(0xFFFF4444),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    if (_usernameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Welcome back, $username! 🎉'),
-          backgroundColor: const Color(0xFF00C851),
+          content: const Text('Please enter your email address first'),
+          backgroundColor: const Color(0xFFFF4444),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
+      return;
+    }
+
+    try {
+      await _authService.sendPasswordResetEmail(_usernameController.text.trim());
       
-      // Navigate to DashboardScreen after login
-      Navigator.pushReplacementNamed(context, '/dashboard');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Password reset email sent! Check your inbox 📧'),
+            backgroundColor: const Color(0xFF00C851),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: const Color(0xFFFF4444),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
@@ -295,14 +426,17 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // Username Field
+                            // Email Field
                             _buildModernTextField(
                               controller: _usernameController,
-                              hintText: 'Email or Username',
-                              prefixIcon: Icons.person_outline_rounded,
+                              hintText: 'Email Address',
+                              prefixIcon: Icons.email_outlined,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Please enter your email or username';
+                                  return 'Please enter your email address';
+                                }
+                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                  return 'Please enter a valid email address';
                                 }
                                 return null;
                               },
@@ -405,16 +539,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                               icon: Icons.g_mobiledata_rounded,
                               text: 'Continue with Google',
                               colors: [const Color(0xFFDB4437), const Color(0xFFEA4335)],
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Google login coming soon! 🚀'),
-                                    backgroundColor: const Color(0xFFDB4437),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                );
-                              },
+                              onPressed: _isLoading ? () {} : () => _signInWithGoogle(),
                             ),
                             
                             const SizedBox(height: 16),
@@ -439,15 +564,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                             
                             // Forgot Password
                             TextButton(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Password reset coming soon! 🔐'),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                );
-                              },
+                              onPressed: () => _resetPassword(),
                               child: Text(
                                 'Forgot Password?',
                                 style: TextStyle(
