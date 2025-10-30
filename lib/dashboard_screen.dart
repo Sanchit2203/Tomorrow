@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:tomorrow/home_feed_screen.dart';
-import 'package:tomorrow/search_screen.dart';
 import 'package:tomorrow/add_post_screen.dart';
-import 'package:tomorrow/reels_screen.dart';
 import 'package:tomorrow/profile_screen.dart';
 import 'package:tomorrow/services/auth_service.dart';
 
@@ -23,9 +21,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   static const List<Widget> _widgetOptions = <Widget>[
     HomeFeedScreen(),
-    SearchScreen(),
+    Center(child: Text('Search', style: TextStyle(fontSize: 24))),
     AddPostScreen(),
-    ReelsScreen(),
+    Center(child: Text('Reels', style: TextStyle(fontSize: 24))),
     ProfileScreen(),
   ];
 
