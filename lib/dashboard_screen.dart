@@ -21,9 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   static const List<Widget> _widgetOptions = <Widget>[
     HomeFeedScreen(),
-    Center(child: Text('Search', style: TextStyle(fontSize: 24))),
     AddPostScreen(),
-    Center(child: Text('Reels', style: TextStyle(fontSize: 24))),
     ProfileScreen(),
   ];
 
@@ -243,24 +241,14 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   label: 'Home',
                 ),
                 _buildNavItem(
-                  icon: Icons.search_rounded,
-                  index: 1,
-                  label: 'Search',
-                ),
-                _buildNavItem(
                   icon: Icons.add_circle_outline_rounded,
-                  index: 2,
+                  index: 1,
                   label: 'Create',
                   isCenter: true,
                 ),
                 _buildNavItem(
-                  icon: Icons.movie_filter_rounded,
-                  index: 3,
-                  label: 'Reels',
-                ),
-                _buildNavItem(
                   icon: Icons.person_rounded,
-                  index: 4,
+                  index: 2,
                   label: 'Profile',
                 ),
               ],
