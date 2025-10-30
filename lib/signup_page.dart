@@ -76,9 +76,11 @@ class _SignupPageState extends State<SignupPage> with TickerProviderStateMixin {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please agree to the Terms of Service'),
+        SnackBar(
+          content: const Text('Please agree to the Terms of Service'),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
       return;
@@ -86,9 +88,11 @@ class _SignupPageState extends State<SignupPage> with TickerProviderStateMixin {
     
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Passwords do not match'),
+        SnackBar(
+          content: const Text('Passwords do not match'),
           backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
       return;
@@ -97,31 +101,67 @@ class _SignupPageState extends State<SignupPage> with TickerProviderStateMixin {
     setState(() => _isLoading = true);
     
     try {
+      print('Starting signup process...');
+      
       final result = await _authService.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
       
-      if (result != null) {
-        // Update profile with display name
-        await result.user?.updateDisplayName(_fullNameController.text.trim());
+      if (result != null && result.user != null) {
+        print('User created successfully: ${result.user!.uid}');
+        
+        // Update Firebase Auth profile with display name
+        await result.user!.updateDisplayName(_fullNameController.text.trim());
+        await result.user!.reload();
+        
+        print('Display name updated successfully');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Account created successfully!'),
-              backgroundColor: Colors.green,
+            SnackBar(
+              content: const Text('Account created successfully! 🎉'),
+              backgroundColor: const Color(0xFF00C851),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           );
           Navigator.pushReplacementNamed(context, '/dashboard');
         }
       }
     } catch (e) {
+      print('Signup error: $e');
+      
+      String errorMessage = 'Sign up failed: ${e.toString().replaceFirst('Exception: ', '')}';
+      
+      // Provide more helpful error messages
+      if (e.toString().contains('permission-denied') || e.toString().contains('PERMISSION_DENIED')) {
+        errorMessage = 'Database access denied. Please check Firebase security rules.';
+      } else if (e.toString().contains('network')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (e.toString().contains('email-already-in-use')) {
+        errorMessage = 'This email is already registered. Please use a different email or try signing in.';
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Sign up failed: ${e.toString()}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(errorMessage),
+                const SizedBox(height: 4),
+                const Text(
+                  'Tip: Check FIREBASE_SETUP.md for configuration help',
+                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ],
+            ),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 8),
           ),
         );
       }

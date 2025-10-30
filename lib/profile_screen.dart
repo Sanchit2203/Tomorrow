@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:tomorrow/services/profile_service.dart';
+import 'package:tomorrow/services/auth_service.dart';
+import 'package:tomorrow/models/user_model.dart';
+import 'package:tomorrow/edit_profile_screen.dart';
+import 'package:tomorrow/test_firebase_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -10,6 +16,8 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateMixin {
   late TabController _tabController;
+  final ProfileService _profileService = ProfileService();
+  final AuthService _authService = AuthService();
   
   @override
   void initState() {
@@ -25,70 +33,111 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Replace with actual user data from authentication service
-    const String username = "Loading...";
-    const String displayName = "";
-    const String bio = "";
-    const String profileImageUrl = "";
-    const int postCount = 0;
-    const int followerCount = 0;
-    const int followingCount = 0;
+    return StreamBuilder<UserModel?>(
+      stream: _profileService.streamCurrentUserProfile(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7)),
+              ),
+            ),
+          );
+        }
 
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          username == "Loading..." ? "Profile" : username, 
-          style: const TextStyle(
-            color: Colors.black, 
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          )
-        ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_box_outlined, color: Colors.black),
-            onPressed: () => _showCreateMenu(context),
-            tooltip: 'Create Post',
-          ),
-        ],
-      ),
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          _buildProfileHeader(
-            displayName: displayName,
-            bio: bio,
-            username: username,
-            profileImageUrl: profileImageUrl,
-            postCount: postCount,
-            followerCount: followerCount,
-            followingCount: followingCount,
-          ),
-        ],
-        body: Column(
-          children: [
-            _buildTabBar(),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Profile'),
+              backgroundColor: Colors.white,
+            ),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildPostsGrid(),
-                  _buildTaggedGrid(),
-                  _buildSavedGrid(),
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Error: ${snapshot.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => setState(() {}),
+                    child: const Text('Retry'),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
+          );
+        }
+
+        final user = snapshot.data;
+        final String username = user?.username ?? "Loading...";
+        final String displayName = user?.displayName ?? "";
+        final String bio = user?.bio ?? "";
+        final String profileImageUrl = user?.profileImageUrl ?? "";
+        final int postCount = user?.postCount ?? 0;
+        final int followerCount = user?.followerCount ?? 0;
+        final int followingCount = user?.followingCount ?? 0;
+
+        return Scaffold(
+          backgroundColor: Colors.grey[50],
+          appBar: AppBar(
+            title: Text(
+              username == "Loading..." ? "Profile" : "@$username", 
+              style: const TextStyle(
+                color: Colors.black, 
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              )
+            ),
+            backgroundColor: Colors.white,
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            centerTitle: false,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add_box_outlined, color: Colors.black),
+                onPressed: () => _showCreateMenu(context),
+                tooltip: 'Create Post',
+              ),
+            ],
+          ),
+          body: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              _buildProfileHeader(
+                user: user,
+                displayName: displayName,
+                bio: bio,
+                username: username,
+                profileImageUrl: profileImageUrl,
+                postCount: postCount,
+                followerCount: followerCount,
+                followingCount: followingCount,
+              ),
+            ],
+            body: Column(
+              children: [
+                _buildTabBar(),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildPostsGrid(),
+                      _buildTaggedGrid(),
+                      _buildSavedGrid(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildProfileHeader({
+    required UserModel? user,
     required String displayName,
     required String bio,
     required String username,
@@ -213,7 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 Expanded(
                   flex: 4,
                   child: ElevatedButton.icon(
-                    onPressed: () => _editProfile(context),
+                    onPressed: () => _editProfile(context, user),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF6C5CE7),
                       foregroundColor: Colors.white,
@@ -616,6 +665,20 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ),
             const Divider(),
             ListTile(
+              leading: const Icon(Icons.bug_report),
+              title: const Text('Test Firebase'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TestFirebaseScreen(),
+                  ),
+                );
+              },
+            ),
+            const Divider(),
+            ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Logout', style: TextStyle(color: Colors.red)),
               onTap: () => _logout(context),
@@ -643,9 +706,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               title: const Text('Take Photo'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Camera functionality coming soon!')),
-                );
+                _updateProfileImage(ImageSource.camera);
               },
             ),
             ListTile(
@@ -653,9 +714,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               title: const Text('Choose from Gallery'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Gallery functionality coming soon!')),
-                );
+                _updateProfileImage(ImageSource.gallery);
               },
             ),
             ListTile(
@@ -663,9 +722,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Photo removed')),
-                );
+                _removeProfileImage();
               },
             ),
           ],
@@ -674,10 +731,73 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  void _editProfile(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit Profile screen coming soon!')),
-    );
+  Future<void> _updateProfileImage(ImageSource source) async {
+    try {
+      String? imageUrl = await _profileService.updateProfileImage(source: source);
+      if (imageUrl != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile image updated successfully!'),
+            backgroundColor: Color(0xFF00C851),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update profile image: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeProfileImage() async {
+    try {
+      await _profileService.removeProfileImage();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile image removed'),
+            backgroundColor: Color(0xFF00C851),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove profile image: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _editProfile(BuildContext context, UserModel? user) {
+    if (user != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EditProfileScreen(user: user),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to edit profile. Please try again.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _shareProfile(BuildContext context) {
@@ -774,13 +894,30 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              Navigator.pop(context);
-              // In real app: _authService.signOut();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Logged out successfully')),
-              );
+              try {
+                await _authService.signOut();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Logged out successfully'),
+                      backgroundColor: Color(0xFF00C851),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to logout: ${e.toString().replaceFirst('Exception: ', '')}'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Logout', style: TextStyle(color: Colors.red)),
           ),

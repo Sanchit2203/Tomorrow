@@ -1,9 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:tomorrow/services/database_service.dart';
+import 'package:tomorrow/models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final DatabaseService _databaseService = DatabaseService();
 
   // Get current user
   User? get currentUser => _auth.currentUser;
@@ -21,6 +24,15 @@ class AuthService {
         email: email,
         password: password,
       );
+      
+      // Check if user document exists in Firestore, create if not
+      if (result.user != null) {
+        UserModel? existingUser = await _databaseService.getUser(result.user!.uid);
+        if (existingUser == null) {
+          await _databaseService.createUserFromAuth(result.user!);
+        }
+      }
+      
       return result;
     } on FirebaseAuthException catch (e) {
       switch (e.code) {
@@ -50,12 +62,25 @@ class AuthService {
     required String password,
   }) async {
     try {
+      print('Creating user with email: $email');
+      
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+      
+      print('Firebase Auth user created: ${result.user?.uid}');
+      
+      // Create user document in Firestore
+      if (result.user != null) {
+        print('Creating user document in Firestore...');
+        await _databaseService.createUserFromAuth(result.user!);
+        print('User document created successfully');
+      }
+      
       return result;
     } on FirebaseAuthException catch (e) {
+      print('FirebaseAuthException: ${e.code} - ${e.message}');
       switch (e.code) {
         case 'weak-password':
           throw Exception('The password provided is too weak.');
@@ -69,6 +94,10 @@ class AuthService {
           throw Exception('Registration failed: ${e.message}');
       }
     } catch (e) {
+      print('General auth error: $e');
+      if (e.toString().contains('permission-denied') || e.toString().contains('PERMISSION_DENIED')) {
+        throw Exception('Database access denied. Please configure Firestore security rules.');
+      }
       throw Exception('An unexpected error occurred: $e');
     }
   }
@@ -94,7 +123,17 @@ class AuthService {
       );
 
       // Once signed in, return the UserCredential
-      return await _auth.signInWithCredential(credential);
+      UserCredential result = await _auth.signInWithCredential(credential);
+      
+      // Check if user document exists in Firestore, create if not
+      if (result.user != null) {
+        UserModel? existingUser = await _databaseService.getUser(result.user!.uid);
+        if (existingUser == null) {
+          await _databaseService.createUserFromAuth(result.user!);
+        }
+      }
+      
+      return result;
     } on FirebaseAuthException catch (e) {
       throw Exception('Google sign-in failed: ${e.message}');
     } catch (e) {
