@@ -5,12 +5,12 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dummy data - replace with actual data
-    const String username = "your_username";
-    const String profileImageUrl = ""; // Add a placeholder or actual image URL
-    const int postCount = 100;
-    const int followerCount = 1000;
-    const int followingCount = 500;
+    // TODO: Replace with actual user data from authentication service
+    const String username = "Loading...";
+    const String profileImageUrl = "";
+    const int postCount = 0;
+    const int followerCount = 0;
+    const int followingCount = 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -58,14 +58,14 @@ class ProfileScreen extends StatelessWidget {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    "Your Name", // Replace with actual name
+                    "Loading...", // TODO: Replace with actual name
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    "Your bio description here. Keep it short and sweet.", // Replace with actual bio
+                    "Welcome to Tomorrow", // TODO: Replace with actual bio
                   ),
                 ),
                 const SizedBox(height: 16.0),
@@ -92,23 +92,38 @@ class ProfileScreen extends StatelessWidget {
           // _buildStoryHighlights(),
 
           const Divider(),
-          // Posts Grid
-          GridView.builder(
-            shrinkWrap: true, // Important to make GridView work inside ListView
-            physics: const NeverScrollableScrollPhysics(), // Disable scrolling for the GridView itself
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 2.0,
-              mainAxisSpacing: 2.0,
+          // Posts Grid - Empty State
+          SizedBox(
+            height: 200,
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'No posts yet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Start sharing your memories!',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            itemCount: 21, // Replace with actual number of posts
-            itemBuilder: (context, index) {
-              // Replace with your actual post widget or image
-              return Container(
-                color: Colors.grey[300],
-                child: Center(child: Text("Post ${index + 1}")),
-              );
-            },
           ),
         ],
       ),
