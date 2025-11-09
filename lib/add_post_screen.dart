@@ -16,14 +16,13 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
   late Animation<double> _fadeAnimation;
   
   final List<String> _mediaOptions = [
-    'Camera', 'Gallery', 'Video', 'Story', 'Reel', 'Live'
+    'Camera', 'Gallery', 'Video', 'Reel', 'Live'
   ];
   
   final List<IconData> _mediaIcons = [
     Icons.camera_alt_rounded,
     Icons.photo_library_rounded,
     Icons.videocam_rounded,
-    Icons.auto_stories_rounded,
     Icons.movie_filter_rounded,
     Icons.live_tv_rounded,
   ];
@@ -266,16 +265,6 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
           children: [
             Expanded(
               child: _buildQuickActionButton(
-                icon: Icons.flash_on_rounded,
-                title: 'Stories',
-                subtitle: '24h visibility',
-                colors: [const Color(0xFFFF6B6B), const Color(0xFFFF8E8E)],
-                onTap: () => _showCreateStoryDialog(),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildQuickActionButton(
                 icon: Icons.movie_filter_rounded,
                 title: 'Reels',
                 subtitle: 'Short videos',
@@ -490,13 +479,10 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
       case 2: // Video
         _openVideoCamera();
         break;
-      case 3: // Story
-        _showCreateStoryDialog();
-        break;
-      case 4: // Reel
+      case 3: // Reel
         _showCreateReelDialog();
         break;
-      case 5: // Live
+      case 4: // Live
         _showGoLiveDialog();
         break;
     }
@@ -551,10 +537,6 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
-  }
-
-  void _showCreateStoryDialog() {
-    _showFeatureDialog('Stories', 'Create 24-hour stories', Icons.flash_on_rounded, const Color(0xFFFF6B6B));
   }
 
   void _showCreateReelDialog() {

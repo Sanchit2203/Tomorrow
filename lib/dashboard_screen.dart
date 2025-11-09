@@ -4,6 +4,7 @@ import 'package:tomorrow/home_feed_screen.dart';
 import 'package:tomorrow/add_post_screen.dart';
 import 'package:tomorrow/profile_screen.dart';
 import 'package:tomorrow/services/auth_service.dart';
+import 'package:tomorrow/create_post_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -139,15 +140,17 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               ShaderMask(
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [Colors.white, Colors.white70],
+                                shaderCallback: (bounds) => LinearGradient(
+                                  colors: isDark 
+                                    ? [Colors.white, Colors.white70]
+                                    : [Colors.black, Colors.black87],
                                 ).createShader(bounds),
-                                child: const Text(
+                                child: Text(
                                   'Tomorrow',
                                   style: TextStyle(
                                     fontSize: 28,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: isDark ? Colors.white : Colors.black,
                                     letterSpacing: -0.5,
                                   ),
                                 ),
@@ -156,7 +159,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                 'Welcome back! 👋',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.white.withOpacity(0.8),
+                                  color: isDark ? Colors.white.withOpacity(0.8) : Colors.black.withOpacity(0.8),
                                   fontWeight: FontWeight.w400,
                                 ),
                               ),
@@ -256,6 +259,34 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ),
         ),
       ),
+      
+      // Floating Action Button for Quick Content Creation
+      floatingActionButton: _selectedIndex == 0 ? Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6C5CE7), Color(0xFFA8E6CF)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6C5CE7).withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: () => _showContentCreationOptions(context),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: const Icon(
+            Icons.add,
+            size: 28,
+            color: Colors.white,
+          ),
+        ),
+      ) : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -553,6 +584,118 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           ],
         );
       },
+    );
+  }
+
+  void _showContentCreationOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Create Content',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Create Post Option
+            GestureDetector(
+              onTap: () async {
+                Navigator.pop(context);
+                try {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreatePostScreen(),
+                    ),
+                  );
+                  if (result != null && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Post created successfully! 🎉'),
+                        backgroundColor: Color(0xFF00C851),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to create post: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF6C5CE7), Color(0xFF9B59B6)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6C5CE7).withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.add_photo_alternate,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    SizedBox(width: 16),
+                    Text(
+                      'Create Post',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Spacer(),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -77,20 +77,6 @@ service cloud.firestore {
       allow create: if request.auth != null;
     }
     
-    // Stories collection (if implementing stories feature)
-    match /stories/{storyId} {
-      // Anyone authenticated can read active stories
-      allow read: if request.auth != null;
-      
-      // Users can create their own stories
-      allow create: if request.auth != null 
-        && request.auth.uid == request.resource.data.authorId;
-      
-      // Users can update/delete their own stories
-      allow update, delete: if request.auth != null 
-        && request.auth.uid == resource.data.authorId;
-    }
-    
     // Chat/Messages collection (if implementing chat)
     match /chats/{chatId} {
       // Users can read chats they're part of
