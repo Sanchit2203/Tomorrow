@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:tomorrow/services/media_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AddPostScreen extends StatefulWidget {
   const AddPostScreen({super.key});
@@ -14,6 +17,13 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
+  
+  // Post creation variables
+  final MediaService _mediaService = MediaService();
+  List<File> _selectedImages = [];
+  File? _selectedVideo;
+  bool _isLoading = false;
+  bool _isPublic = true;
   
   final List<String> _mediaOptions = [
     'Camera', 'Gallery', 'Video', 'Reel', 'Live'
@@ -488,55 +498,55 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
     }
   }
 
-  void _openCamera() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.camera_alt_rounded, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Camera opening soon! 📸'),
-          ],
-        ),
-        backgroundColor: const Color(0xFF6C5CE7),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+  void _openCamera() async {
+    try {
+      List<File> images = await _mediaService.pickImages(
+        source: ImageSource.camera,
+        maxImages: 1,
+      );
+      if (images.isNotEmpty) {
+        setState(() {
+          _selectedImages = images;
+          _selectedVideo = null; // Clear video if image is selected
+        });
+        _showPostCreationDialog();
+      }
+    } catch (e) {
+      _showErrorSnackBar('Failed to take photo: $e');
+    }
   }
 
-  void _openGallery() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.photo_library_rounded, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Gallery opening soon! 🖼️'),
-          ],
-        ),
-        backgroundColor: const Color(0xFF4ECDC4),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+  void _openGallery() async {
+    try {
+      List<File> images = await _mediaService.pickImages(
+        source: ImageSource.gallery,
+        maxImages: 10,
+      );
+      if (images.isNotEmpty) {
+        setState(() {
+          _selectedImages = images;
+          _selectedVideo = null; // Clear video if images are selected
+        });
+        _showPostCreationDialog();
+      }
+    } catch (e) {
+      _showErrorSnackBar('Failed to pick images: $e');
+    }
   }
 
-  void _openVideoCamera() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.videocam_rounded, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Video camera opening soon! 🎥'),
-          ],
-        ),
-        backgroundColor: const Color(0xFF45B7D1),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+  void _openVideoCamera() async {
+    try {
+      File? video = await _mediaService.pickVideo(source: ImageSource.camera);
+      if (video != null) {
+        setState(() {
+          _selectedVideo = video;
+          _selectedImages.clear(); // Clear images if video is selected
+        });
+        _showPostCreationDialog();
+      }
+    } catch (e) {
+      _showErrorSnackBar('Failed to record video: $e');
+    }
   }
 
   void _showCreateReelDialog() {
@@ -643,5 +653,257 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _showPostCreationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          constraints: const BoxConstraints(maxHeight: 600),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Create Post',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Media Preview
+              if (_selectedImages.isNotEmpty) ...[
+                SizedBox(
+                  height: 200,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _selectedImages.length,
+                    itemBuilder: (context, index) {
+                      return Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        width: 200,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          image: DecorationImage(
+                            image: FileImage(_selectedImages[index]),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              
+              if (_selectedVideo != null) ...[
+                Container(
+                  height: 200,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.grey[300],
+                  ),
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.play_circle_filled, size: 50, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text('Video Selected', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              
+              // Caption Input
+              Expanded(
+                child: TextField(
+                  controller: _captionController,
+                  maxLines: null,
+                  decoration: InputDecoration(
+                    hintText: 'Write a caption...',
+                    hintStyle: TextStyle(color: Colors.grey[600]),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.grey),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Location Input
+              TextField(
+                controller: _locationController,
+                decoration: InputDecoration(
+                  hintText: 'Add location (optional)',
+                  hintStyle: TextStyle(color: Colors.grey[600]),
+                  prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.grey),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Privacy Toggle
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Public Post',
+                    style: TextStyle(fontSize: 16, color: Colors.black),
+                  ),
+                  Switch(
+                    value: _isPublic,
+                    onChanged: (value) {
+                      setState(() {
+                        _isPublic = value;
+                      });
+                    },
+                    activeColor: const Color(0xFF6C5CE7),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Share Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _createPost,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6C5CE7),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Share Post',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createPost() async {
+    if (_captionController.text.isEmpty && _selectedImages.isEmpty && _selectedVideo == null) {
+      _showErrorSnackBar('Please add content or media to your post');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _mediaService.createPost(
+        content: _captionController.text,
+        images: _selectedImages.isNotEmpty ? _selectedImages : null,
+        video: _selectedVideo,
+        location: _locationController.text,
+        isPublic: _isPublic,
+      );
+
+      // Clear form
+      _captionController.clear();
+      _locationController.clear();
+      setState(() {
+        _selectedImages.clear();
+        _selectedVideo = null;
+        _isLoading = false;
+      });
+
+      // Close dialog and show success
+      if (mounted) {
+        Navigator.pop(context);
+        _showSuccessSnackBar('Post shared successfully! 🎉');
+        
+        // Navigate back to home or refresh feed
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      _showErrorSnackBar('Failed to create post: $e');
+    }
   }
 }
