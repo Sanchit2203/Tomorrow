@@ -82,36 +82,58 @@ service firebase.storage {
     // Validation rules for file uploads
     function isValidImageUpload() {
       return request.resource.size < 10 * 1024 * 1024  // 10MB limit
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     }
     
     function isValidVideoUpload() {
       return request.resource.size < 100 * 1024 * 1024  // 100MB limit
-        && request.resource.contentType.matches('video/.*');
+        && request.resource.contentType.matches('video/.*')
+        && request.resource.contentType in ['video/mp4', 'video/mov', 'video/avi', 'video/quicktime'];
     }
     
     function isValidAudioUpload() {
       return request.resource.size < 50 * 1024 * 1024  // 50MB limit
-        && request.resource.contentType.matches('audio/.*');
+        && request.resource.contentType.matches('audio/.*')
+        && request.resource.contentType in ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/aac'];
     }
     
-    // Apply validation to user uploads
+    function isValidDocumentUpload() {
+      return request.resource.size < 20 * 1024 * 1024  // 20MB limit
+        && request.resource.contentType in ['application/pdf', 'text/plain', 'application/msword'];
+    }
+    
+    // Apply validation to user uploads with enhanced security
     match /users/{userId}/profile/{filename} {
       allow write: if request.auth != null 
         && request.auth.uid == userId 
-        && isValidImageUpload();
+        && isValidImageUpload()
+        && filename.matches('.*\\.(jpg|jpeg|png|gif|webp)');
     }
     
     match /users/{userId}/posts/{filename} {
       allow write: if request.auth != null 
         && request.auth.uid == userId 
-        && (isValidImageUpload() || isValidVideoUpload() || isValidAudioUpload());
+        && (isValidImageUpload() || isValidVideoUpload() || isValidAudioUpload() || isValidDocumentUpload())
+        && filename.matches('.*\\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mpeg|wav|mp3|aac|pdf|txt|doc)');
     }
     
     match /users/{userId}/stories/{filename} {
       allow write: if request.auth != null 
         && request.auth.uid == userId 
-        && (isValidImageUpload() || isValidVideoUpload());
+        && (isValidImageUpload() || isValidVideoUpload())
+        && filename.matches('.*\\.(jpg|jpeg|png|gif|webp|mp4|mov|avi)');
+    }
+    
+    // Time capsule scheduled content (enhanced security)
+    match /users/{userId}/scheduled/{filename} {
+      allow read, write: if request.auth != null 
+        && request.auth.uid == userId 
+        && (isValidImageUpload() || isValidVideoUpload() || isValidAudioUpload())
+        && filename.matches('.*\\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mpeg|wav|mp3|aac)');
+      
+      allow delete: if request.auth != null 
+        && request.auth.uid == userId;
     }
     
     // Default deny rule for any other paths

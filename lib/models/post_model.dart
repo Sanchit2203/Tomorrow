@@ -19,6 +19,10 @@ class PostModel {
   final DateTime updatedAt;
   final String location;
   final bool isPublic;
+  // Time capsule scheduling fields
+  final bool isScheduled;
+  final DateTime? scheduledAt;
+  final String? postStatus; // 'draft', 'scheduled', 'published', 'cancelled'
 
   PostModel({
     required this.id,
@@ -39,6 +43,9 @@ class PostModel {
     required this.updatedAt,
     this.location = '',
     this.isPublic = true,
+    this.isScheduled = false,
+    this.scheduledAt,
+    this.postStatus = 'published',
   });
 
   Map<String, dynamic> toMap() {
@@ -57,10 +64,13 @@ class PostModel {
       'commentCount': commentCount,
       'shareCount': shareCount,
       'likes': likes,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
       'location': location,
       'isPublic': isPublic,
+      'isScheduled': isScheduled,
+      'scheduledAt': scheduledAt != null ? Timestamp.fromDate(scheduledAt!) : null,
+      'postStatus': postStatus,
     };
   }
 
@@ -80,11 +90,27 @@ class PostModel {
       commentCount: map['commentCount']?.toInt() ?? 0,
       shareCount: map['shareCount']?.toInt() ?? 0,
       likes: List<String>.from(map['likes'] ?? []),
-      createdAt: DateTime.parse(map['createdAt']),
-      updatedAt: DateTime.parse(map['updatedAt']),
+      createdAt: _parseDateTime(map['createdAt']),
+      updatedAt: _parseDateTime(map['updatedAt']),
       location: map['location'] ?? '',
       isPublic: map['isPublic'] ?? true,
+      isScheduled: map['isScheduled'] ?? false,
+      scheduledAt: map['scheduledAt'] != null ? _parseDateTime(map['scheduledAt']) : null,
+      postStatus: map['postStatus'] ?? 'published',
     );
+  }
+
+  // Helper method to parse DateTime from either Timestamp or String
+  static DateTime _parseDateTime(dynamic dateTime) {
+    if (dateTime is Timestamp) {
+      return dateTime.toDate();
+    } else if (dateTime is String) {
+      return DateTime.parse(dateTime);
+    } else {
+      print('Warning: Unexpected dateTime format: ${dateTime.runtimeType} - $dateTime');
+      // Fallback to current time if format is unexpected
+      return DateTime.now();
+    }
   }
 
   factory PostModel.fromDocument(DocumentSnapshot doc) {
@@ -111,6 +137,9 @@ class PostModel {
     DateTime? updatedAt,
     String? location,
     bool? isPublic,
+    bool? isScheduled,
+    DateTime? scheduledAt,
+    String? postStatus,
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -131,6 +160,9 @@ class PostModel {
       updatedAt: updatedAt ?? this.updatedAt,
       location: location ?? this.location,
       isPublic: isPublic ?? this.isPublic,
+      isScheduled: isScheduled ?? this.isScheduled,
+      scheduledAt: scheduledAt ?? this.scheduledAt,
+      postStatus: postStatus ?? this.postStatus,
     );
   }
 }

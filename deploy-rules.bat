@@ -1,9 +1,9 @@
 @echo off
-REM Firebase Rules Deployment Script for Tomorrow App (Windows)
-REM This script helps deploy Firestore and Storage security rules
+REM Firebase Rules and Indexes Deployment Script for Tomorrow App (Windows)
+REM This script helps deploy Firestore rules, indexes, and Storage security rules
 
-echo 🔥 Firebase Rules Deployment for Tomorrow App
-echo ==============================================
+echo 🔥 Firebase Rules and Indexes Deployment for Tomorrow App
+echo ========================================================
 
 REM Check if Firebase CLI is installed
 firebase --version >nul 2>&1
@@ -47,6 +47,17 @@ if %errorlevel% neq 0 (
 )
 echo ✅ Firestore rules deployed successfully!
 
+REM Deploy Firestore indexes
+echo.
+echo 📤 Deploying Firestore indexes...
+firebase deploy --only firestore:indexes
+if %errorlevel% neq 0 (
+    echo ❌ Failed to deploy Firestore indexes
+    pause
+    exit /b 1
+)
+echo ✅ Firestore indexes deployed successfully!
+
 REM Deploy Storage rules
 echo.
 echo 📤 Deploying Storage rules...
@@ -59,14 +70,17 @@ if %errorlevel% neq 0 (
 echo ✅ Storage rules deployed successfully!
 
 echo.
-echo 🎉 All rules deployed successfully!
+echo 🎉 All rules and indexes deployed successfully!
 echo.
 echo 📋 Next steps:
 echo 1. Test your app signup process
-echo 2. Go to Profile → Settings → Test Firebase
-echo 3. Verify all tests pass with ✅
+echo 2. Test time capsule scheduled posts
+echo 3. Go to Profile → Settings → Test Firebase
+echo 4. Verify all tests pass with ✅
 echo.
-echo 🔗 View your rules in Firebase Console:
-echo    https://console.firebase.google.com/
+echo 🔗 View your configuration in Firebase Console:
+echo    Rules: https://console.firebase.google.com/project/[PROJECT]/firestore/rules
+echo    Indexes: https://console.firebase.google.com/project/[PROJECT]/firestore/indexes
+echo    Storage: https://console.firebase.google.com/project/[PROJECT]/storage/rules
 
 pause

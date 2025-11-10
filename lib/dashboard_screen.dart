@@ -20,10 +20,26 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   late PageController _pageController;
   final AuthService _authService = AuthService();
 
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomeFeedScreen(),
-    AddPostScreen(),
-    ProfileScreen(),
+  void _onItemTapped(int index) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _selectedIndex = index;
+    });
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _navigateToHome() {
+    _onItemTapped(0);
+  }
+
+  List<Widget> get _widgetOptions => [
+    const HomeFeedScreen(),
+    AddPostScreen(onPostCreated: _navigateToHome),
+    const ProfileScreen(),
   ];
 
   @override
@@ -45,18 +61,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     _appBarController.dispose();
     _pageController.dispose();
     super.dispose();
-  }
-
-  void _onItemTapped(int index) {
-    HapticFeedback.lightImpact();
-    setState(() {
-      _selectedIndex = index;
-    });
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
   }
 
   @override

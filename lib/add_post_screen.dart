@@ -5,7 +5,8 @@ import 'package:tomorrow/services/media_service.dart';
 import 'package:image_picker/image_picker.dart';
 
 class AddPostScreen extends StatefulWidget {
-  const AddPostScreen({super.key});
+  final VoidCallback? onPostCreated;
+  const AddPostScreen({super.key, this.onPostCreated});
 
   @override
   State<AddPostScreen> createState() => _AddPostScreenState();
@@ -24,6 +25,10 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
   File? _selectedVideo;
   bool _isLoading = false;
   bool _isPublic = true;
+  
+  // Scheduling variables
+  bool _isScheduled = false;
+  DateTime? _scheduledDateTime;
   
   final List<String> _mediaOptions = [
     'Camera', 'Gallery', 'Video', 'Reel', 'Live'
@@ -696,7 +701,10 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           padding: const EdgeInsets.all(20),
-          constraints: const BoxConstraints(maxHeight: 600),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+            maxWidth: MediaQuery.of(context).size.width * 0.9,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -720,115 +728,225 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
               ),
               const SizedBox(height: 16),
               
-              // Media Preview
-              if (_selectedImages.isNotEmpty) ...[
-                SizedBox(
-                  height: 200,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _selectedImages.length,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        width: 200,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          image: DecorationImage(
-                            image: FileImage(_selectedImages[index]),
-                            fit: BoxFit.cover,
+              // Scrollable content
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Media Preview
+                      if (_selectedImages.isNotEmpty) ...[
+                        SizedBox(
+                          height: 200,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _selectedImages.length,
+                            itemBuilder: (context, index) {
+                              return Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                width: 200,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  image: DecorationImage(
+                                    image: FileImage(_selectedImages[index]),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              
-              if (_selectedVideo != null) ...[
-                Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    color: Colors.grey[300],
-                  ),
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.play_circle_filled, size: 50, color: Colors.grey),
-                        SizedBox(height: 8),
-                        Text('Video Selected', style: TextStyle(color: Colors.grey)),
+                        const SizedBox(height: 16),
                       ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              
-              // Caption Input
-              Expanded(
-                child: TextField(
-                  controller: _captionController,
-                  maxLines: null,
-                  decoration: InputDecoration(
-                    hintText: 'Write a caption...',
-                    hintStyle: TextStyle(color: Colors.grey[600]),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.grey),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
-                    ),
+                      
+                      if (_selectedVideo != null) ...[
+                        Container(
+                          height: 200,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.grey[300],
+                          ),
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.play_circle_filled, size: 50, color: Colors.grey),
+                                SizedBox(height: 8),
+                                Text('Video Selected', style: TextStyle(color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      
+                      // Caption Input
+                      Container(
+                        height: 100,
+                        child: TextField(
+                          controller: _captionController,
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical: TextAlignVertical.top,
+                          decoration: InputDecoration(
+                            hintText: 'Write a caption...',
+                            hintStyle: TextStyle(color: Colors.grey[600]),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Colors.grey),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
+                            ),
+                            contentPadding: const EdgeInsets.all(12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Location Input
+                      TextField(
+                        controller: _locationController,
+                        decoration: InputDecoration(
+                          hintText: 'Add location (optional)',
+                          hintStyle: TextStyle(color: Colors.grey[600]),
+                          prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.grey),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Privacy Toggle
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Public Post',
+                            style: TextStyle(fontSize: 16, color: Colors.black),
+                          ),
+                          Switch(
+                            value: _isPublic,
+                            onChanged: (value) {
+                              setState(() {
+                                _isPublic = value;
+                              });
+                            },
+                            activeColor: const Color(0xFF6C5CE7),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Time Capsule Scheduling
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey.shade50,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  color: _isScheduled ? const Color(0xFF6C5CE7) : Colors.grey,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Time Capsule',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: _isScheduled ? const Color(0xFF6C5CE7) : Colors.black,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Switch(
+                                  value: _isScheduled,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _isScheduled = value;
+                                      if (!value) {
+                                        _scheduledDateTime = null;
+                                      }
+                                    });
+                                  },
+                                  activeColor: const Color(0xFF6C5CE7),
+                                ),
+                              ],
+                            ),
+                            if (_isScheduled) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                'Schedule your post to appear in the future',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              InkWell(
+                                onTap: () => _selectScheduleDateTime(),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey.shade400),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.white,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_today,
+                                        color: Color(0xFF6C5CE7),
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          _scheduledDateTime != null
+                                              ? '${_formatScheduledDate(_scheduledDateTime!)}'
+                                              : 'Select date and time',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: _scheduledDateTime != null 
+                                                ? Colors.black 
+                                                : Colors.grey[600],
+                                          ),
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.arrow_drop_down,
+                                        color: Colors.grey,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
               
-              // Location Input
-              TextField(
-                controller: _locationController,
-                decoration: InputDecoration(
-                  hintText: 'Add location (optional)',
-                  hintStyle: TextStyle(color: Colors.grey[600]),
-                  prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.grey),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Privacy Toggle
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Public Post',
-                    style: TextStyle(fontSize: 16, color: Colors.black),
-                  ),
-                  Switch(
-                    value: _isPublic,
-                    onChanged: (value) {
-                      setState(() {
-                        _isPublic = value;
-                      });
-                    },
-                    activeColor: const Color(0xFF6C5CE7),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              // Share Button
+              // Share Button - Fixed at bottom
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -850,9 +968,9 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : const Text(
-                          'Share Post',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      : Text(
+                          _isScheduled ? 'Schedule Post' : 'Share Post',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                 ),
               ),
@@ -869,18 +987,44 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
       return;
     }
 
+    // Validate scheduled post
+    if (_isScheduled) {
+      if (_scheduledDateTime == null) {
+        _showErrorSnackBar('Please select a date and time for your time capsule');
+        return;
+      }
+      
+      if (_scheduledDateTime!.isBefore(DateTime.now().add(const Duration(minutes: 5)))) {
+        _showErrorSnackBar('Scheduled time must be at least 5 minutes in the future');
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await _mediaService.createPost(
-        content: _captionController.text,
-        images: _selectedImages.isNotEmpty ? _selectedImages : null,
-        video: _selectedVideo,
-        location: _locationController.text,
-        isPublic: _isPublic,
-      );
+      if (_isScheduled && _scheduledDateTime != null) {
+        // Create scheduled post
+        await _mediaService.createScheduledPost(
+          content: _captionController.text,
+          scheduledAt: _scheduledDateTime!,
+          images: _selectedImages.isNotEmpty ? _selectedImages : null,
+          video: _selectedVideo,
+          location: _locationController.text,
+          isPublic: _isPublic,
+        );
+      } else {
+        // Create regular post
+        await _mediaService.createPost(
+          content: _captionController.text,
+          images: _selectedImages.isNotEmpty ? _selectedImages : null,
+          video: _selectedVideo,
+          location: _locationController.text,
+          isPublic: _isPublic,
+        );
+      }
 
       // Clear form
       _captionController.clear();
@@ -889,21 +1033,118 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
         _selectedImages.clear();
         _selectedVideo = null;
         _isLoading = false;
+        _isScheduled = false;
+        _scheduledDateTime = null;
       });
 
       // Close dialog and show success
       if (mounted) {
         Navigator.pop(context);
-        _showSuccessSnackBar('Post shared successfully! 🎉');
+        final message = _isScheduled 
+            ? 'Time capsule scheduled successfully! ⏰'
+            : 'Post shared successfully! 🎉';
+        _showSuccessSnackBar(message);
         
-        // Navigate back to home or refresh feed
-        Navigator.pop(context);
+        // Navigate back to home tab if callback is provided
+        widget.onPostCreated?.call();
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-      _showErrorSnackBar('Failed to create post: $e');
+      if (mounted) {
+        _showErrorSnackBar('Failed to create post: $e');
+      }
     }
+  }
+
+  Future<void> _selectScheduleDateTime() async {
+    final DateTime now = DateTime.now();
+    final DateTime? date = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDateTime ?? now.add(const Duration(hours: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: 'Select date for your time capsule',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF6C5CE7),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (date != null) {
+      final TimeOfDay? time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(
+          _scheduledDateTime ?? now.add(const Duration(hours: 1)),
+        ),
+        helpText: 'Select time for your time capsule',
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: Color(0xFF6C5CE7),
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (time != null) {
+        final scheduledDateTime = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        );
+
+        // Validate the scheduled time is at least 5 minutes in the future
+        if (scheduledDateTime.isBefore(now.add(const Duration(minutes: 5)))) {
+          _showErrorSnackBar('Scheduled time must be at least 5 minutes in the future');
+          return;
+        }
+
+        setState(() {
+          _scheduledDateTime = scheduledDateTime;
+        });
+      }
+    }
+  }
+
+  String _formatScheduledDate(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = dateTime.difference(now);
+
+    // Format: "Tomorrow at 2:30 PM" or "Dec 25 at 10:00 AM"
+    String dateStr;
+    if (difference.inDays == 0) {
+      dateStr = 'Today';
+    } else if (difference.inDays == 1) {
+      dateStr = 'Tomorrow';
+    } else if (difference.inDays < 7) {
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      dateStr = days[dateTime.weekday - 1];
+    } else {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      dateStr = '${months[dateTime.month - 1]} ${dateTime.day}';
+    }
+
+    // Format time
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    final timeStr = '$displayHour:${minute.toString().padLeft(2, '0')} $amPm';
+
+    return '$dateStr at $timeStr';
   }
 }

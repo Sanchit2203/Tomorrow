@@ -21,6 +21,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   File? _selectedVideo;
   bool _isLoading = false;
   bool _isPublic = true;
+  
+  // Time Capsule features
+  bool _isScheduled = false;
+  DateTime? _scheduledDateTime;
 
   @override
   void dispose() {
@@ -111,25 +115,56 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
       return;
     }
 
+    // Validate scheduled post
+    if (_isScheduled) {
+      if (_scheduledDateTime == null) {
+        _showErrorSnackBar('Please select a date and time for your time capsule');
+        return;
+      }
+      
+      if (_scheduledDateTime!.isBefore(DateTime.now().add(const Duration(minutes: 5)))) {
+        _showErrorSnackBar('Scheduled time must be at least 5 minutes in the future');
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      PostModel post = await _mediaService.createPost(
-        content: _contentController.text.trim(),
-        images: _selectedImages.isNotEmpty ? _selectedImages : null,
-        video: _selectedVideo,
-        location: _locationController.text.trim(),
-        isPublic: _isPublic,
-      );
+      PostModel post;
+      
+      if (_isScheduled && _scheduledDateTime != null) {
+        // Create scheduled time capsule post
+        post = await _mediaService.createScheduledPost(
+          content: _contentController.text.trim(),
+          scheduledAt: _scheduledDateTime!,
+          images: _selectedImages.isNotEmpty ? _selectedImages : null,
+          video: _selectedVideo,
+          location: _locationController.text.trim(),
+          isPublic: _isPublic,
+        );
+      } else {
+        // Create regular post
+        post = await _mediaService.createPost(
+          content: _contentController.text.trim(),
+          images: _selectedImages.isNotEmpty ? _selectedImages : null,
+          video: _selectedVideo,
+          location: _locationController.text.trim(),
+          isPublic: _isPublic,
+        );
+      }
 
       if (mounted) {
         Navigator.pop(context, post);
+        final message = _isScheduled 
+            ? 'Time capsule scheduled successfully! ⏰' 
+            : 'Post created successfully! 🎉';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post created successfully! 🎉'),
-            backgroundColor: Color(0xFF00C851),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: const Color(0xFF00C851),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -155,6 +190,96 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  Future<void> _selectScheduleDateTime() async {
+    final DateTime now = DateTime.now();
+    final DateTime? date = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDateTime ?? now.add(const Duration(hours: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: 'Select date for your time capsule',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF6C5CE7),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (date != null && mounted) {
+      final TimeOfDay? time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(
+          _scheduledDateTime ?? now.add(const Duration(hours: 1)),
+        ),
+        helpText: 'Select time for your time capsule',
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: Color(0xFF6C5CE7),
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (time != null && mounted) {
+        final scheduledDateTime = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        );
+
+        // Validate the scheduled time is at least 5 minutes in the future
+        if (scheduledDateTime.isBefore(now.add(const Duration(minutes: 5)))) {
+          _showErrorSnackBar('Scheduled time must be at least 5 minutes in the future');
+          return;
+        }
+
+        setState(() {
+          _scheduledDateTime = scheduledDateTime;
+        });
+      }
+    }
+  }
+
+  String _formatScheduledDate(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = dateTime.difference(now);
+
+    // Format: "Tomorrow at 2:30 PM" or "Dec 25 at 10:00 AM"
+    String dateStr;
+    if (difference.inDays == 0) {
+      dateStr = 'Today';
+    } else if (difference.inDays == 1) {
+      dateStr = 'Tomorrow';
+    } else if (difference.inDays < 7) {
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      dateStr = days[dateTime.weekday - 1];
+    } else {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      dateStr = '${months[dateTime.month - 1]} ${dateTime.day}';
+    }
+
+    // Format time
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    final timeStr = '$displayHour:${minute.toString().padLeft(2, '0')} $amPm';
+
+    return '$dateStr at $timeStr';
   }
 
   void _showMediaPicker() {
@@ -297,9 +422,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7)),
                     ),
                   )
-                : const Text(
-                    'Share',
-                    style: TextStyle(
+                : Text(
+                    _isScheduled ? 'Schedule' : 'Share',
+                    style: const TextStyle(
                       color: Color(0xFF6C5CE7),
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -456,6 +581,165 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     activeColor: const Color(0xFF6C5CE7),
                   ),
                   Text(_isPublic ? 'Public' : 'Private'),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Time Capsule Scheduling
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _isScheduled 
+                      ? const Color(0xFF6C5CE7).withOpacity(0.5) 
+                      : Colors.grey.shade300,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _isScheduled 
+                              ? const Color(0xFF6C5CE7).withOpacity(0.1)
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.access_time_rounded,
+                          color: _isScheduled ? const Color(0xFF6C5CE7) : Colors.grey,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Time Capsule',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _isScheduled ? const Color(0xFF6C5CE7) : Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              'Schedule your post for the future',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _isScheduled,
+                        onChanged: (value) {
+                          setState(() {
+                            _isScheduled = value;
+                            if (!value) {
+                              _scheduledDateTime = null;
+                            }
+                          });
+                        },
+                        activeColor: const Color(0xFF6C5CE7),
+                      ),
+                    ],
+                  ),
+                  if (_isScheduled) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6C5CE7).withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFF6C5CE7).withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 16,
+                                color: const Color(0xFF6C5CE7),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Your post will appear on the selected date',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: const Color(0xFF6C5CE7),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onTap: _selectScheduleDateTime,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today,
+                                    color: const Color(0xFF6C5CE7),
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      _scheduledDateTime != null
+                                          ? _formatScheduledDate(_scheduledDateTime!)
+                                          : 'Select date and time',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: _scheduledDateTime != null 
+                                            ? Colors.black87 
+                                            : Colors.grey[600],
+                                        fontWeight: _scheduledDateTime != null 
+                                            ? FontWeight.w500
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    color: Colors.grey[600],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

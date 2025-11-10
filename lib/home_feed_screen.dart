@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:tomorrow/create_post_screen.dart';
 import 'package:tomorrow/services/media_service.dart';
 import 'package:tomorrow/models/post_model.dart';
@@ -433,6 +434,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
   }
 
   void _showPostOptions(PostModel post) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isOwner = currentUser != null && currentUser.uid == post.authorId;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -443,6 +447,25 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (isOwner) ...[
+              ListTile(
+                leading: const Icon(Icons.edit, color: Colors.blue),
+                title: const Text('Edit'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editPost(post);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Delete'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _confirmDeletePost(post);
+                },
+              ),
+              const Divider(),
+            ],
             ListTile(
               leading: const Icon(Icons.share),
               title: const Text('Share'),
@@ -459,14 +482,15 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
                 // TODO: Implement copy link
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.report),
-              title: const Text('Report'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Implement report
-              },
-            ),
+            if (!isOwner)
+              ListTile(
+                leading: const Icon(Icons.report, color: Colors.orange),
+                title: const Text('Report'),
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: Implement report
+                },
+              ),
           ],
         ),
       ),
@@ -506,5 +530,103 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Searching for $hashtag...')),
     );
+  }
+
+  void _editPost(PostModel post) {
+    // TODO: Implement post editing functionality
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Edit functionality coming soon!')),
+    );
+  }
+
+  void _confirmDeletePost(PostModel post) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text(
+          'Delete Post',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+        ),
+        content: const Text(
+          'Are you sure you want to delete this post? This action cannot be undone.',
+          style: TextStyle(color: Colors.black87),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deletePost(post);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deletePost(PostModel post) async {
+    try {
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+              ),
+              SizedBox(width: 12),
+              Text('Deleting post...'),
+            ],
+          ),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      await MediaService().deletePost(post.id);
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_outline, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Post deleted successfully'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Failed to delete post: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }

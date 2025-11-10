@@ -13,16 +13,46 @@ service cloud.firestore {
     
     // Posts collection - users can create posts and manage their own posts
     match /posts/{postId} {
-      // Anyone authenticated can read posts
-      allow read: if request.auth != null;
+      // Only read published posts or own posts (including scheduled)
+      allow read: if request.auth != null && (
+        resource.data.postStatus == 'published' ||
+        request.auth.uid == resource.data.authorId
+      );
       
-      // Users can create posts
+      // Users can create posts with proper validation
       allow create: if request.auth != null 
-        && request.auth.uid == request.resource.data.authorId;
+        && request.auth.uid == request.resource.data.authorId
+        && validatePostData();
       
-      // Users can update/delete their own posts
-      allow update, delete: if request.auth != null 
+      // Users can update/delete their own posts with validation
+      allow update: if request.auth != null 
+        && request.auth.uid == resource.data.authorId
+        && validatePostUpdate();
+      
+      // Users can delete their own posts
+      allow delete: if request.auth != null 
         && request.auth.uid == resource.data.authorId;
+    }
+    
+    // Post validation functions
+    function validatePostData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['authorId', 'content', 'createdAt', 'postStatus']) &&
+        data.authorId is string &&
+        data.content is string &&
+        data.createdAt is timestamp &&
+        data.postStatus in ['draft', 'published', 'scheduled', 'cancelled'] &&
+        (data.postStatus != 'scheduled' || data.scheduledAt is timestamp) &&
+        (data.postStatus != 'scheduled' || data.scheduledAt > request.time);
+    }
+    
+    function validatePostUpdate() {
+      let data = request.resource.data;
+      return data.authorId == resource.data.authorId &&  // Can't change author
+        data.createdAt == resource.data.createdAt &&      // Can't change creation time
+        data.postStatus in ['draft', 'published', 'scheduled', 'cancelled'] &&
+        (data.postStatus != 'scheduled' || data.scheduledAt is timestamp) &&
+        (data.postStatus != 'scheduled' || data.scheduledAt > request.time);
     }
     
     // Comments collection (nested under posts)
