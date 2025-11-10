@@ -427,7 +427,57 @@ class MediaService {
         .where('authorId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => PostModel.fromDocument(doc)).toList());
+        .asyncMap((snapshot) async {
+          final now = DateTime.now();
+          List<PostModel> posts = [];
+          List<String> postsToAutoPublish = [];
+          
+          for (var doc in snapshot.docs) {
+            try {
+              PostModel post = PostModel.fromDocument(doc);
+              
+              // Check if this is a scheduled post that should be published now
+              if (post.postStatus == 'scheduled' && 
+                  post.isScheduled && 
+                  post.scheduledAt != null &&
+                  !post.scheduledAt!.isAfter(now)) {
+                
+                postsToAutoPublish.add(post.id);
+                // Update the post status in memory for immediate display
+                post = post.copyWith(postStatus: 'published');
+              }
+              
+              posts.add(post);
+            } catch (e) {
+              print('Error processing user post: $e');
+              continue;
+            }
+          }
+          
+          // Auto-publish scheduled posts that are ready (async, non-blocking)
+          if (postsToAutoPublish.isNotEmpty) {
+            _autoPublishPostsBackground(postsToAutoPublish, userId);
+          }
+          
+          return posts;
+        });
+  }
+  
+  /// Auto-publish posts in background
+  Future<void> _autoPublishPostsBackground(List<String> postIds, String userId) async {
+    try {
+      for (String postId in postIds) {
+        try {
+          await publishScheduledPost(postId);
+          print('Auto-published scheduled post: $postId');
+        } catch (e) {
+          print('Error auto-publishing post $postId: $e');
+        }
+      }
+      // Note: publishScheduledPost already increments the user's post count
+    } catch (e) {
+      print('Error in background auto-publishing: $e');
+    }
   }
 
   /// Stream feed posts (published posts + scheduled posts that are ready)
@@ -443,7 +493,7 @@ class MediaService {
           print('Error in streamFeedPosts: $error');
           print('Error type: ${error.runtimeType}');
         })
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
           print('Received snapshot with ${snapshot.docs.length} documents');
           final now = DateTime.now();
           List<PostModel> posts = [];
@@ -456,14 +506,28 @@ class MediaService {
               if (post.postStatus == 'published') {
                 posts.add(post);
               }
-              // Include scheduled posts that are ready (past their scheduled time)
+              // Auto-publish scheduled posts that are ready (past their scheduled time)
               else if (post.postStatus == 'scheduled' && 
                        post.isScheduled && 
                        post.scheduledAt != null &&
                        !post.scheduledAt!.isAfter(now)) {
-                // Show scheduled posts that are ready without auto-publishing for now
-                // (to avoid permission issues, we'll handle auto-publishing separately)
-                posts.add(post);
+                print('Auto-publishing scheduled post: ${post.id}');
+                try {
+                  // Auto-publish the scheduled post
+                  await _autoPublishScheduledPostInFeed(post.id);
+                  
+                  // Add the post as published to the feed
+                  final publishedPost = post.copyWith(
+                    postStatus: 'published',
+                    isScheduled: false,
+                    scheduledAt: null,
+                  );
+                  posts.add(publishedPost);
+                } catch (e) {
+                  print('Failed to auto-publish post ${post.id}: $e');
+                  // If auto-publish fails, still show the post as scheduled
+                  posts.add(post);
+                }
               }
             } catch (e) {
               print('Error processing post document: $e');
@@ -476,6 +540,38 @@ class MediaService {
           print('Returning ${posts.length} posts');
           return posts.take(limit).toList();
         });
+  }
+
+  /// Auto-publish a single scheduled post for feed display
+  Future<void> _autoPublishScheduledPostInFeed(String postId) async {
+    try {
+      print('Auto-publishing scheduled post in feed: $postId');
+      
+      // Get current user
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        print('User not authenticated');
+        return;
+      }
+
+      // Update the post document
+      await _firestore.collection(postsCollection).doc(postId).update({
+        'postStatus': 'published',
+        'isScheduled': false,
+        'scheduledAt': null,
+        'publishedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Increment user's post count
+      await _firestore.collection('users').doc(user.uid).update({
+        'postCount': FieldValue.increment(1),
+      });
+      
+      print('Successfully auto-published post: $postId');
+    } catch (e) {
+      print('Error auto-publishing post $postId: $e');
+      rethrow;
+    }
   }
 
   /// Auto-publish scheduled posts that are ready
