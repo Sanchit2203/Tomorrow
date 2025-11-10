@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:tomorrow/signup_page.dart'; // Added import for signup_page.dart
-import 'package:tomorrow/dashboard_screen.dart'; // Import the new dashboard screen
+import 'package:tomorrow/signup_page.dart'; 
+import 'package:tomorrow/dashboard_screen.dart'; 
 import 'package:tomorrow/services/auth_service.dart';
 import 'package:tomorrow/auth_wrapper.dart';
 import 'firebase_options.dart';
