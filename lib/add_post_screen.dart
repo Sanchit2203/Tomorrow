@@ -116,10 +116,6 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                           // Quick Actions
                           _buildQuickActions(),
                           
-                          const SizedBox(height: 32),
-                          
-                          // Recent Media Preview
-                          _buildRecentMediaPreview(),
                         ],
                       ),
                     ),
