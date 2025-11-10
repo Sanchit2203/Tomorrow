@@ -590,6 +590,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
+                        color: Colors.black,
                       ),
                       textAlign: TextAlign.center,
                       maxLines: 4,
@@ -805,18 +806,18 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                       if (post.imageUrls.isNotEmpty) const SizedBox(height: 12),
                       Text(
                         post.content,
-                        style: const TextStyle(fontSize: 16),
+                        style: const TextStyle(fontSize: 16, color: Colors.black),
                       ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
                           const Icon(Icons.favorite, color: Colors.red, size: 16),
                           const SizedBox(width: 4),
-                          Text('${post.likeCount}'),
+                          Text('${post.likeCount}', style: const TextStyle(color: Colors.black)),
                           const SizedBox(width: 16),
                           const Icon(Icons.comment, color: Colors.blue, size: 16),
                           const SizedBox(width: 4),
-                          Text('${post.commentCount}'),
+                          Text('${post.commentCount}', style: const TextStyle(color: Colors.black)),
                         ],
                       ),
                     ],
@@ -1725,7 +1726,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         const SizedBox(height: 4),
                         Text(
                           post.content,
-                          style: const TextStyle(fontSize: 16),
+                          style: const TextStyle(fontSize: 16, color: Colors.black),
                         ),
                         const SizedBox(height: 12),
                       ],

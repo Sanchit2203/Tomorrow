@@ -251,6 +251,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
+                          color: Colors.black,
                         ),
                       ),
                       Text(
@@ -278,7 +279,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
                 post.content,
-                style: const TextStyle(fontSize: 14, height: 1.4),
+                style: const TextStyle(fontSize: 14, height: 1.4, color: Colors.black),
               ),
             ),
 
@@ -373,7 +374,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
-                      Text('${post.likeCount}', style: const TextStyle(fontSize: 14)),
+                      Text('${post.likeCount}', style: const TextStyle(fontSize: 14, color: Colors.black)),
                     ],
                   ),
                 ),
@@ -389,7 +390,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
-                      Text('${post.commentCount}', style: const TextStyle(fontSize: 14)),
+                      Text('${post.commentCount}', style: const TextStyle(fontSize: 14, color: Colors.black)),
                     ],
                   ),
                 ),
@@ -405,7 +406,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
-                      Text('${post.shareCount}', style: const TextStyle(fontSize: 14)),
+                      Text('${post.shareCount}', style: const TextStyle(fontSize: 14, color: Colors.black)),
                     ],
                   ),
                 ),
