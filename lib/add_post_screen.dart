@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:tomorrow/services/media_service.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AddPostScreen extends StatefulWidget {
   final VoidCallback? onPostCreated;
@@ -505,6 +506,14 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
 
   void _openCamera() async {
     try {
+      // Request camera permission
+      PermissionStatus cameraPermission = await Permission.camera.request();
+      
+      if (cameraPermission != PermissionStatus.granted) {
+        _showErrorSnackBar('Camera permission is required to take photos');
+        return;
+      }
+
       List<File> images = await _mediaService.pickImages(
         source: ImageSource.camera,
         maxImages: 1,
@@ -541,6 +550,14 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
 
   void _openVideoCamera() async {
     try {
+      // Request camera permission
+      PermissionStatus cameraPermission = await Permission.camera.request();
+      
+      if (cameraPermission != PermissionStatus.granted) {
+        _showErrorSnackBar('Camera permission is required to record videos');
+        return;
+      }
+
       File? video = await _mediaService.pickVideo(source: ImageSource.camera);
       if (video != null) {
         setState(() {

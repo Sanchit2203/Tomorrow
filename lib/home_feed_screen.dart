@@ -54,6 +54,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
             StreamBuilder<List<PostModel>>(
               stream: _mediaService.streamFeedPosts(limit: 20),
               builder: (context, snapshot) {
+                // Debug prints
+                print('StreamBuilder state: ${snapshot.connectionState}');
+                print('StreamBuilder hasError: ${snapshot.hasError}');
+                if (snapshot.hasError) {
+                  print('StreamBuilder error: ${snapshot.error}');
+                  print('StreamBuilder error type: ${snapshot.error.runtimeType}');
+                }
+                print('StreamBuilder hasData: ${snapshot.hasData}');
+                if (snapshot.hasData) {
+                  print('StreamBuilder data length: ${snapshot.data?.length}');
+                }
+
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return SliverToBoxAdapter(
                     child: Container(

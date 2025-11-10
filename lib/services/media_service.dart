@@ -430,16 +430,70 @@ class MediaService {
         .map((snapshot) => snapshot.docs.map((doc) => PostModel.fromDocument(doc)).toList());
   }
 
-  /// Stream feed posts (only published posts)
+  /// Stream feed posts (published posts + scheduled posts that are ready)
   Stream<List<PostModel>> streamFeedPosts({int limit = 20}) {
+    print('Starting streamFeedPosts with limit: $limit');
     return _firestore
         .collection(postsCollection)
         .where('isPublic', isEqualTo: true)
-        .where('postStatus', isEqualTo: 'published')
         .orderBy('createdAt', descending: true)
-        .limit(limit)
+        .limit(limit * 2) // Get more to filter
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => PostModel.fromDocument(doc)).toList());
+        .handleError((error) {
+          print('Error in streamFeedPosts: $error');
+          print('Error type: ${error.runtimeType}');
+        })
+        .map((snapshot) {
+          print('Received snapshot with ${snapshot.docs.length} documents');
+          final now = DateTime.now();
+          List<PostModel> posts = [];
+          
+          for (var doc in snapshot.docs) {
+            try {
+              PostModel post = PostModel.fromDocument(doc);
+              
+              // Include published posts
+              if (post.postStatus == 'published') {
+                posts.add(post);
+              }
+              // Include scheduled posts that are ready (past their scheduled time)
+              else if (post.postStatus == 'scheduled' && 
+                       post.isScheduled && 
+                       post.scheduledAt != null &&
+                       !post.scheduledAt!.isAfter(now)) {
+                // Show scheduled posts that are ready without auto-publishing for now
+                // (to avoid permission issues, we'll handle auto-publishing separately)
+                posts.add(post);
+              }
+            } catch (e) {
+              print('Error processing post document: $e');
+              continue;
+            }
+          }
+          
+          // Sort by creation date and limit results
+          posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          print('Returning ${posts.length} posts');
+          return posts.take(limit).toList();
+        });
+  }
+
+  /// Auto-publish scheduled posts that are ready
+  Future<void> autoPublishReadyPosts() async {
+    try {
+      final readyPosts = await getPostsReadyToPublish();
+      
+      for (PostModel post in readyPosts) {
+        try {
+          await publishScheduledPost(post.id);
+          print('Auto-published scheduled post: ${post.id}');
+        } catch (e) {
+          print('Error auto-publishing post ${post.id}: $e');
+        }
+      }
+    } catch (e) {
+      print('Error in auto-publish process: $e');
+    }
   }
 
   /// Check for scheduled posts that should be published now
