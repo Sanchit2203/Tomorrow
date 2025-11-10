@@ -12,6 +12,7 @@ class UserModel {
   final int followingCount;
   final List<String> followers;
   final List<String> following;
+  final List<String> savedPosts;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,6 +28,7 @@ class UserModel {
     this.followingCount = 0,
     this.followers = const [],
     this.following = const [],
+    this.savedPosts = const [],
     required this.createdAt,
     required this.updatedAt,
   });
@@ -45,6 +47,7 @@ class UserModel {
       'followingCount': followingCount,
       'followers': followers,
       'following': following,
+      'savedPosts': savedPosts,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -64,6 +67,7 @@ class UserModel {
       followingCount: map['followingCount']?.toInt() ?? 0,
       followers: List<String>.from(map['followers'] ?? []),
       following: List<String>.from(map['following'] ?? []),
+      savedPosts: List<String>.from(map['savedPosts'] ?? []),
       createdAt: DateTime.parse(map['createdAt']),
       updatedAt: DateTime.parse(map['updatedAt']),
     );
@@ -88,6 +92,7 @@ class UserModel {
     int? followingCount,
     List<String>? followers,
     List<String>? following,
+    List<String>? savedPosts,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -103,6 +108,7 @@ class UserModel {
       followingCount: followingCount ?? this.followingCount,
       followers: followers ?? this.followers,
       following: following ?? this.following,
+      savedPosts: savedPosts ?? this.savedPosts,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -16,6 +16,11 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   final MediaService _mediaService = MediaService();
+  
+  // Track like and save states for posts
+  final Map<String, bool> _likedPosts = {};
+  final Map<String, bool> _savedPosts = {};
+  final Map<String, int> _likeCounts = {};
 
   @override
   void initState() {
@@ -28,6 +33,9 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
     _controller.forward();
+    
+    // Load saved posts state
+    _loadSavedPostsState();
   }
 
   @override
@@ -43,8 +51,18 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
       child: RefreshIndicator(
         onRefresh: () async {
           HapticFeedback.mediumImpact();
-          await Future.delayed(const Duration(seconds: 1));
-          // TODO: Implement actual data refresh
+          
+          // Clear optimistic states and reload
+          setState(() {
+            _likedPosts.clear();
+            _savedPosts.clear();
+            _likeCounts.clear();
+          });
+          
+          // Reload saved posts state
+          await _loadSavedPostsState();
+          
+          await Future.delayed(const Duration(milliseconds: 500));
         },
         color: const Color(0xFF6C5CE7),
         child: CustomScrollView(
@@ -366,7 +384,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
                         onPressed: () => _likePost(post),
                         icon: Icon(
                           Icons.favorite,
-                          color: post.likes.contains('current_user_id') // TODO: Replace with actual user ID
+                          color: _isPostLiked(post) 
                               ? Colors.red
                               : Colors.grey,
                         ),
@@ -374,7 +392,7 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
                         constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
-                      Text('${post.likeCount}', style: const TextStyle(fontSize: 14, color: Colors.black)),
+                      Text('${_getPostLikeCount(post)}', style: const TextStyle(fontSize: 14, color: Colors.black)),
                     ],
                   ),
                 ),
@@ -413,7 +431,10 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
                 const Spacer(),
                 IconButton(
                   onPressed: () => _savePost(post),
-                  icon: const Icon(Icons.bookmark_border, color: Colors.grey),
+                  icon: Icon(
+                    _isPostSaved(post) ? Icons.bookmark : Icons.bookmark_border,
+                    color: _isPostSaved(post) ? const Color(0xFF6C5CE7) : Colors.grey,
+                  ),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -510,11 +531,54 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
     );
   }
 
-  void _likePost(PostModel post) {
-    // TODO: Implement like functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Like functionality coming soon!')),
-    );
+  void _likePost(PostModel post) async {
+    try {
+      HapticFeedback.lightImpact();
+      
+      // Optimistically update UI
+      setState(() {
+        bool currentlyLiked = _isPostLiked(post);
+        _likedPosts[post.id] = !currentlyLiked;
+        
+        // Update like count optimistically
+        int currentCount = _getPostLikeCount(post);
+        _likeCounts[post.id] = currentlyLiked ? currentCount - 1 : currentCount + 1;
+      });
+
+      // Make the actual API call
+      bool newLikeState = await _mediaService.toggleLikePost(post.id);
+      
+      // Update the state with the actual result
+      setState(() {
+        _likedPosts[post.id] = newLikeState;
+        // The like count will be updated when the stream refreshes
+      });
+
+    } catch (e) {
+      // Revert optimistic update on error
+      setState(() {
+        bool originalState = post.likes.contains(FirebaseAuth.instance.currentUser?.uid);
+        _likedPosts[post.id] = originalState;
+        _likeCounts[post.id] = post.likeCount;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Failed to update like: ${e.toString().replaceFirst('Exception: ', '')}')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
   }
 
   void _commentOnPost(PostModel post) {
@@ -531,11 +595,123 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
     );
   }
 
-  void _savePost(PostModel post) {
-    // TODO: Implement save functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Save functionality coming soon!')),
-    );
+  void _savePost(PostModel post) async {
+    try {
+      HapticFeedback.lightImpact();
+      
+      // Optimistically update UI
+      bool currentlySaved = _isPostSaved(post);
+      setState(() {
+        _savedPosts[post.id] = !currentlySaved;
+      });
+
+      // Make the actual API call
+      bool newSaveState = await _mediaService.toggleSavePost(post.id);
+      
+      // Update the state with the actual result
+      setState(() {
+        _savedPosts[post.id] = newSaveState;
+      });
+
+      // Show feedback to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  newSaveState ? Icons.bookmark : Icons.bookmark_border, 
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 12),
+                Text(newSaveState ? 'Post saved! 📌' : 'Post removed from saved'),
+              ],
+            ),
+            backgroundColor: newSaveState ? const Color(0xFF6C5CE7) : Colors.grey,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+    } catch (e) {
+      // Revert optimistic update on error
+      setState(() {
+        _savedPosts.remove(post.id);
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Failed to save post: ${e.toString().replaceFirst('Exception: ', '')}')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    }
+  }
+
+  // Helper methods for like and save states
+  bool _isPostLiked(PostModel post) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return false;
+    
+    // Check optimistic state first, then fall back to post data
+    if (_likedPosts.containsKey(post.id)) {
+      return _likedPosts[post.id]!;
+    }
+    
+    return post.likes.contains(currentUserId);
+  }
+
+  bool _isPostSaved(PostModel post) {
+    // Check optimistic state first
+    if (_savedPosts.containsKey(post.id)) {
+      return _savedPosts[post.id]!;
+    }
+    
+    // For now, return false as we'll load saved state when needed
+    // In a real app, you might want to preload this data
+    return false;
+  }
+
+  int _getPostLikeCount(PostModel post) {
+    // Check optimistic state first, then fall back to post data
+    if (_likeCounts.containsKey(post.id)) {
+      return _likeCounts[post.id]!;
+    }
+    
+    return post.likeCount;
+  }
+
+  // Load saved posts state for the current user
+  Future<void> _loadSavedPostsState() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Get user saved posts
+      final savedPosts = await _mediaService.getUserSavedPosts();
+      if (mounted) {
+        setState(() {
+          _savedPosts.clear();
+          for (final post in savedPosts) {
+            _savedPosts[post.id] = true;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading saved posts state: $e');
+    }
   }
 
   void _searchHashtag(String hashtag) {

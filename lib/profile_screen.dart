@@ -891,61 +891,121 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   Widget _buildSavedGrid() {
-    return Container(
-      color: Colors.grey[50],
-      child: SingleChildScrollView(
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 400),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 60.0),
+    return StreamBuilder<List<PostModel>>(
+      stream: _mediaService.streamUserSavedPosts(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            color: Colors.grey[50],
+            child: const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6C5CE7)),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Container(
+            color: Colors.grey[50],
+            child: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.bookmark_border,
-                      size: 50,
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Saved posts',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Save posts you want to see again. Only you can see what you\'ve saved.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                      height: 1.4,
-                    ),
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Error loading saved posts: ${snapshot.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => setState(() {}),
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
             ),
+          );
+        }
+
+        final savedPosts = snapshot.data ?? [];
+
+        if (savedPosts.isEmpty) {
+          // Empty state
+          return Container(
+            color: Colors.grey[50],
+            child: SingleChildScrollView(
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 400),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 60.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.bookmark_border,
+                            size: 50,
+                            color: Color(0xFF6C5CE7),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Saved posts',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Save posts you want to see again. Only you can see what you\'ve saved.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Saved posts grid
+        return Container(
+          color: Colors.grey[50],
+          child: GridView.builder(
+            padding: const EdgeInsets.all(2),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 2,
+              mainAxisSpacing: 2,
+            ),
+            itemCount: savedPosts.length,
+            itemBuilder: (context, index) {
+              final post = savedPosts[index];
+              return _buildPostGridItem(post);
+            },
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

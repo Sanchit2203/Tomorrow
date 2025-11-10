@@ -749,4 +749,218 @@ class MediaService {
       throw Exception('Failed to delete post: $e');
     }
   }
+
+  // Like and Save Methods
+
+  /// Toggle like on a post
+  Future<bool> toggleLikePost(String postId) async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('No authenticated user found');
+      }
+
+      print('Toggling like for post: $postId by user: ${currentUser.uid}');
+
+      // Get current post data
+      DocumentSnapshot postDoc = await _firestore.collection(postsCollection).doc(postId).get();
+      if (!postDoc.exists) {
+        throw Exception('Post not found');
+      }
+
+      PostModel post = PostModel.fromDocument(postDoc);
+      List<String> currentLikes = List<String>.from(post.likes);
+      bool isLiked = currentLikes.contains(currentUser.uid);
+
+      if (isLiked) {
+        // Remove like
+        currentLikes.remove(currentUser.uid);
+        print('Removing like from post $postId');
+      } else {
+        // Add like
+        currentLikes.add(currentUser.uid);
+        print('Adding like to post $postId');
+      }
+
+      // Update post in Firestore
+      await _firestore.collection(postsCollection).doc(postId).update({
+        'likes': currentLikes,
+        'likeCount': currentLikes.length,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      print('Like toggled successfully. New like count: ${currentLikes.length}');
+      return !isLiked; // Return new like state
+    } catch (e) {
+      print('Error toggling like: $e');
+      throw Exception('Failed to toggle like: $e');
+    }
+  }
+
+  /// Toggle save on a post
+  Future<bool> toggleSavePost(String postId) async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('No authenticated user found');
+      }
+
+      print('Toggling save for post: $postId by user: ${currentUser.uid}');
+
+      // Get current user data
+      UserModel? userData = await _databaseService.getCurrentUser();
+      if (userData == null) {
+        throw Exception('User data not found');
+      }
+
+      List<String> currentSavedPosts = List<String>.from(userData.savedPosts);
+      bool isSaved = currentSavedPosts.contains(postId);
+
+      if (isSaved) {
+        // Remove from saved
+        currentSavedPosts.remove(postId);
+        print('Removing post $postId from saved posts');
+      } else {
+        // Add to saved
+        currentSavedPosts.add(postId);
+        print('Adding post $postId to saved posts');
+      }
+
+      // Update user in Firestore
+      await _databaseService.updateUser(currentUser.uid, {
+        'savedPosts': currentSavedPosts,
+      });
+
+      print('Save toggled successfully. New saved count: ${currentSavedPosts.length}');
+      return !isSaved; // Return new save state
+    } catch (e) {
+      print('Error toggling save: $e');
+      throw Exception('Failed to toggle save: $e');
+    }
+  }
+
+  /// Check if current user has liked a post
+  Future<bool> isPostLiked(String postId) async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return false;
+
+      DocumentSnapshot postDoc = await _firestore.collection(postsCollection).doc(postId).get();
+      if (!postDoc.exists) return false;
+
+      PostModel post = PostModel.fromDocument(postDoc);
+      return post.likes.contains(currentUser.uid);
+    } catch (e) {
+      print('Error checking if post is liked: $e');
+      return false;
+    }
+  }
+
+  /// Check if current user has saved a post
+  Future<bool> isPostSaved(String postId) async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return false;
+
+      UserModel? userData = await _databaseService.getCurrentUser();
+      if (userData == null) return false;
+
+      return userData.savedPosts.contains(postId);
+    } catch (e) {
+      print('Error checking if post is saved: $e');
+      return false;
+    }
+  }
+
+  /// Get user's saved posts
+  Future<List<PostModel>> getUserSavedPosts() async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('No authenticated user found');
+      }
+
+      UserModel? userData = await _databaseService.getCurrentUser();
+      if (userData == null) {
+        throw Exception('User data not found');
+      }
+
+      if (userData.savedPosts.isEmpty) {
+        return [];
+      }
+
+      // Get saved posts in batches (Firestore 'in' query limit is 10)
+      List<PostModel> savedPosts = [];
+      List<String> postIds = userData.savedPosts;
+
+      // Process in chunks of 10
+      for (int i = 0; i < postIds.length; i += 10) {
+        List<String> chunk = postIds.skip(i).take(10).toList();
+        
+        QuerySnapshot snapshot = await _firestore
+            .collection(postsCollection)
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get();
+
+        List<PostModel> chunkPosts = snapshot.docs
+            .map((doc) => PostModel.fromDocument(doc))
+            .where((post) => post.postStatus == 'published') // Only show published posts
+            .toList();
+
+        savedPosts.addAll(chunkPosts);
+      }
+
+      // Sort by creation date (most recent first)
+      savedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      return savedPosts;
+    } catch (e) {
+      print('Error getting saved posts: $e');
+      throw Exception('Failed to get saved posts: $e');
+    }
+  }
+
+  /// Stream user's saved posts
+  Stream<List<PostModel>> streamUserSavedPosts() {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      return Stream.value([]);
+    }
+
+    return _databaseService.streamUser(currentUser.uid).asyncMap((userData) async {
+      if (userData == null || userData.savedPosts.isEmpty) {
+        return <PostModel>[];
+      }
+
+      try {
+        List<PostModel> savedPosts = [];
+        List<String> postIds = userData.savedPosts;
+
+        // Process in chunks of 10 (Firestore 'in' query limit)
+        for (int i = 0; i < postIds.length; i += 10) {
+          List<String> chunk = postIds.skip(i).take(10).toList();
+          
+          QuerySnapshot snapshot = await _firestore
+              .collection(postsCollection)
+              .where(FieldPath.documentId, whereIn: chunk)
+              .get();
+
+          List<PostModel> chunkPosts = snapshot.docs
+              .map((doc) => PostModel.fromDocument(doc))
+              .where((post) => post.postStatus == 'published') // Only show published posts
+              .toList();
+
+          savedPosts.addAll(chunkPosts);
+        }
+
+        // Sort by creation date (most recent first)
+        savedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+        return savedPosts;
+      } catch (e) {
+        print('Error streaming saved posts: $e');
+        return <PostModel>[];
+      }
+    });
+  }
 }
