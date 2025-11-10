@@ -43,6 +43,16 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
     Icons.live_tv_rounded,
   ];
 
+  // Static gradients for better performance
+  static const List<List<Color>> _gradients = [
+    [Color(0xFF6C5CE7), Color(0xFFA8E6CF)],
+    [Color(0xFFFF6B6B), Color(0xFF4ECDC4)],
+    [Color(0xFF45B7D1), Color(0xFF96CEB4)],
+    [Color(0xFFFECEA8), Color(0xFFFFC3A0)],
+    [Color(0xFF667eea), Color(0xFF764ba2)],
+    [Color(0xFFf093fb), Color(0xFFf5576c)],
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -200,6 +210,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
             childAspectRatio: 1.0,
           ),
           itemCount: _mediaOptions.length,
+          cacheExtent: 300, // Cache extent for better performance
           itemBuilder: (context, index) => _buildMediaOption(index),
         ),
       ],
@@ -207,15 +218,6 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
   }
 
   Widget _buildMediaOption(int index) {
-    final gradients = [
-      [const Color(0xFF6C5CE7), const Color(0xFFA8E6CF)],
-      [const Color(0xFFFF6B6B), const Color(0xFF4ECDC4)],
-      [const Color(0xFF45B7D1), const Color(0xFF96CEB4)],
-      [const Color(0xFFFECEA8), const Color(0xFFFFC3A0)],
-      [const Color(0xFF667eea), const Color(0xFF764ba2)],
-      [const Color(0xFFf093fb), const Color(0xFFf5576c)],
-    ];
-    
     return GestureDetector(
       onTap: () {
         HapticFeedback.mediumImpact();
@@ -227,11 +229,11 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: gradients[index % gradients.length],
+            colors: _gradients[index % _gradients.length],
           ),
           boxShadow: [
             BoxShadow(
-              color: gradients[index % gradients.length].first.withOpacity(0.4),
+              color: _gradients[index % _gradients.length].first.withOpacity(0.4),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -710,291 +712,353 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
   void _showPostCreationDialog() {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-            maxWidth: MediaQuery.of(context).size.width * 0.9,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Create Post',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+      barrierDismissible: false, // Prevent accidental dismissal during upload
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.9,
+              maxWidth: MediaQuery.of(context).size.width * 0.9,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Create Post',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Colors.grey),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              // Scrollable content
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Media Preview
-                      if (_selectedImages.isNotEmpty) ...[
-                        SizedBox(
-                          height: 200,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _selectedImages.length,
-                            itemBuilder: (context, index) {
-                              return Container(
-                                margin: const EdgeInsets.only(right: 8),
-                                width: 200,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  image: DecorationImage(
-                                    image: FileImage(_selectedImages[index]),
-                                    fit: BoxFit.cover,
+                    IconButton(
+                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.close, 
+                        color: _isLoading ? Colors.grey.shade400 : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Scrollable content
+                Flexible(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Media Preview - Optimized
+                        if (_selectedImages.isNotEmpty) ...[
+                          Container(
+                            height: 200,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _selectedImages.length,
+                              cacheExtent: 600, // Cache more items for smoother scrolling
+                              itemBuilder: (context, index) {
+                                return Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  width: 200,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.file(
+                                      _selectedImages[index],
+                                      fit: BoxFit.cover,
+                                      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                                        if (wasSynchronouslyLoaded) return child;
+                                        return AnimatedOpacity(
+                                          opacity: frame == null ? 0 : 1,
+                                          duration: const Duration(milliseconds: 200),
+                                          child: child,
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          color: Colors.grey[200],
+                                          child: const Center(
+                                            child: Icon(Icons.error, color: Colors.red),
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      
-                      if (_selectedVideo != null) ...[
+                          const SizedBox(height: 16),
+                        ],
+                        
+                        if (_selectedVideo != null) ...[
+                          Container(
+                            height: 200,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.grey[300],
+                            ),
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.play_circle_filled, size: 50, color: Colors.grey),
+                                  SizedBox(height: 8),
+                                  Text('Video Selected', style: TextStyle(color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        
+                        // Caption Input - Optimized
                         Container(
-                          height: 200,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            color: Colors.grey[300],
-                          ),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.play_circle_filled, size: 50, color: Colors.grey),
-                                SizedBox(height: 8),
-                                Text('Video Selected', style: TextStyle(color: Colors.grey)),
-                              ],
+                          height: 100,
+                          child: TextField(
+                            controller: _captionController,
+                            maxLines: null,
+                            expands: true,
+                            textAlignVertical: TextAlignVertical.top,
+                            enabled: !_isLoading,
+                            decoration: InputDecoration(
+                              hintText: 'Write a caption...',
+                              hintStyle: TextStyle(color: Colors.grey[600]),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
+                              ),
+                              contentPadding: const EdgeInsets.all(12),
+                              filled: true,
+                              fillColor: _isLoading ? Colors.grey.shade100 : Colors.white,
                             ),
                           ),
                         ),
                         const SizedBox(height: 16),
-                      ],
-                      
-                      // Caption Input
-                      Container(
-                        height: 100,
-                        child: TextField(
-                          controller: _captionController,
-                          maxLines: null,
-                          expands: true,
-                          textAlignVertical: TextAlignVertical.top,
+                        
+                        // Location Input - Optimized
+                        TextField(
+                          controller: _locationController,
+                          enabled: !_isLoading,
                           decoration: InputDecoration(
-                            hintText: 'Write a caption...',
+                            hintText: 'Add location (optional)',
                             hintStyle: TextStyle(color: Colors.grey[600]),
+                            prefixIcon: Icon(
+                              Icons.location_on_outlined, 
+                              color: _isLoading ? Colors.grey.shade400 : Colors.grey,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Colors.grey),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
                             ),
-                            contentPadding: const EdgeInsets.all(12),
+                            filled: true,
+                            fillColor: _isLoading ? Colors.grey.shade100 : Colors.white,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Location Input
-                      TextField(
-                        controller: _locationController,
-                        decoration: InputDecoration(
-                          hintText: 'Add location (optional)',
-                          hintStyle: TextStyle(color: Colors.grey[600]),
-                          prefixIcon: const Icon(Icons.location_on_outlined, color: Colors.grey),
-                          border: OutlineInputBorder(
+                        const SizedBox(height: 16),
+                        
+                        // Privacy Toggle - Optimized
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Colors.grey),
+                            color: Colors.grey.shade50,
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Color(0xFF6C5CE7)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Privacy Toggle
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Public Post',
-                            style: TextStyle(fontSize: 16, color: Colors.black),
-                          ),
-                          Switch(
-                            value: _isPublic,
-                            onChanged: (value) {
-                              setState(() {
-                                _isPublic = value;
-                              });
-                            },
-                            activeColor: const Color(0xFF6C5CE7),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Time Capsule Scheduling
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(12),
-                          color: Colors.grey.shade50,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time,
-                                  color: _isScheduled ? const Color(0xFF6C5CE7) : Colors.grey,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Time Capsule',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: _isScheduled ? const Color(0xFF6C5CE7) : Colors.black,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Switch(
-                                  value: _isScheduled,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _isScheduled = value;
-                                      if (!value) {
-                                        _scheduledDateTime = null;
-                                      }
-                                    });
-                                  },
-                                  activeColor: const Color(0xFF6C5CE7),
-                                ),
-                              ],
-                            ),
-                            if (_isScheduled) ...[
-                              const SizedBox(height: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
                               Text(
-                                'Schedule your post to appear in the future',
+                                'Public Post',
                                 style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
+                                  fontSize: 16, 
+                                  color: _isLoading ? Colors.grey.shade400 : Colors.black,
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              InkWell(
-                                onTap: () => _selectScheduleDateTime(),
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey.shade400),
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: Colors.white,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.calendar_today,
-                                        color: Color(0xFF6C5CE7),
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          _scheduledDateTime != null
-                                              ? '${_formatScheduledDate(_scheduledDateTime!)}'
-                                              : 'Select date and time',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: _scheduledDateTime != null 
-                                                ? Colors.black 
-                                                : Colors.grey[600],
-                                          ),
-                                        ),
-                                      ),
-                                      const Icon(
-                                        Icons.arrow_drop_down,
-                                        color: Colors.grey,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              Switch(
+                                value: _isPublic,
+                                onChanged: _isLoading ? null : (value) {
+                                  setDialogState(() {
+                                    _isPublic = value;
+                                  });
+                                },
+                                activeColor: const Color(0xFF6C5CE7),
                               ),
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ),
-              
-              // Share Button - Fixed at bottom
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _createPost,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6C5CE7),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                        const SizedBox(height: 16),
+
+                        // Time Capsule Scheduling - Optimized
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: _isLoading ? Colors.grey.shade200 : Colors.grey.shade300,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            color: _isLoading ? Colors.grey.shade100 : Colors.grey.shade50,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time,
+                                    color: _isLoading 
+                                        ? Colors.grey.shade400
+                                        : (_isScheduled ? const Color(0xFF6C5CE7) : Colors.grey),
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Time Capsule',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: _isLoading 
+                                          ? Colors.grey.shade400
+                                          : (_isScheduled ? const Color(0xFF6C5CE7) : Colors.black),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Switch(
+                                    value: _isScheduled,
+                                    onChanged: _isLoading ? null : (value) {
+                                      setDialogState(() {
+                                        _isScheduled = value;
+                                        if (!value) {
+                                          _scheduledDateTime = null;
+                                        }
+                                      });
+                                    },
+                                    activeColor: const Color(0xFF6C5CE7),
+                                  ),
+                                ],
+                              ),
+                              if (_isScheduled) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Schedule your post to appear in the future',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: _isLoading ? Colors.grey.shade400 : Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                InkWell(
+                                  onTap: _isLoading ? null : () => _selectScheduleDateTime(),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: _isLoading ? Colors.grey.shade300 : Colors.grey.shade400,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: _isLoading ? Colors.grey.shade200 : Colors.white,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          color: _isLoading ? Colors.grey.shade400 : const Color(0xFF6C5CE7),
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            _scheduledDateTime != null
+                                                ? '${_formatScheduledDate(_scheduledDateTime!)}'
+                                                : 'Select date and time',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: _scheduledDateTime != null 
+                                                  ? (_isLoading ? Colors.grey.shade500 : Colors.black)
+                                                  : Colors.grey[600],
+                                            ),
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.arrow_drop_down,
+                                          color: _isLoading ? Colors.grey.shade400 : Colors.grey,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text(
-                          _isScheduled ? 'Schedule Post' : 'Share Post',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
                 ),
-              ),
-            ],
+                
+                // Share Button - Fixed at bottom with loading state
+                Container(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : () => _createPost(setDialogState),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isLoading ? Colors.grey.shade300 : const Color(0xFF6C5CE7),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: _isLoading ? 0 : 2,
+                    ),
+                    child: _isLoading
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                _isScheduled ? 'Scheduling...' : 'Sharing...',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            _isScheduled ? 'Schedule Post' : 'Share Post',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Future<void> _createPost() async {
+  Future<void> _createPost([StateSetter? setDialogState]) async {
     if (_captionController.text.isEmpty && _selectedImages.isEmpty && _selectedVideo == null) {
       _showErrorSnackBar('Please add content or media to your post');
       return;
@@ -1013,9 +1077,16 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
       }
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    // Update loading state for both dialog and main widget
+    if (setDialogState != null) {
+      setDialogState(() {
+        _isLoading = true;
+      });
+    } else {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       if (_isScheduled && _scheduledDateTime != null) {
@@ -1042,13 +1113,25 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
       // Clear form
       _captionController.clear();
       _locationController.clear();
-      setState(() {
-        _selectedImages.clear();
-        _selectedVideo = null;
-        _isLoading = false;
-        _isScheduled = false;
-        _scheduledDateTime = null;
-      });
+      
+      // Reset state for both dialog and main widget
+      if (setDialogState != null) {
+        setDialogState(() {
+          _selectedImages.clear();
+          _selectedVideo = null;
+          _isLoading = false;
+          _isScheduled = false;
+          _scheduledDateTime = null;
+        });
+      } else {
+        setState(() {
+          _selectedImages.clear();
+          _selectedVideo = null;
+          _isLoading = false;
+          _isScheduled = false;
+          _scheduledDateTime = null;
+        });
+      }
 
       // Close dialog and show success
       if (mounted) {
@@ -1062,9 +1145,17 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
         widget.onPostCreated?.call();
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      // Reset loading state on error
+      if (setDialogState != null) {
+        setDialogState(() {
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      
       if (mounted) {
         _showErrorSnackBar('Failed to create post: $e');
       }

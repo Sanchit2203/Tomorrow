@@ -535,49 +535,62 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
     try {
       HapticFeedback.lightImpact();
       
-      // Optimistically update UI
-      setState(() {
-        bool currentlyLiked = _isPostLiked(post);
-        _likedPosts[post.id] = !currentlyLiked;
-        
-        // Update like count optimistically
-        int currentCount = _getPostLikeCount(post);
-        _likeCounts[post.id] = currentlyLiked ? currentCount - 1 : currentCount + 1;
-      });
-
-      // Make the actual API call
-      bool newLikeState = await _mediaService.toggleLikePost(post.id);
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
       
-      // Update the state with the actual result
+      // Prevent multiple rapid taps
+      if (_likedPosts.containsKey(post.id + '_processing')) return;
+      
+      // Mark as processing
+      _likedPosts[post.id + '_processing'] = true;
+      
+      // Get current state
+      bool currentlyLiked = _isPostLiked(post);
+      bool newLikeState = !currentlyLiked;
+      int currentCount = _getPostLikeCount(post);
+      int newCount = newLikeState ? currentCount + 1 : currentCount - 1;
+      
+      // Optimistically update UI (single setState)
       setState(() {
         _likedPosts[post.id] = newLikeState;
-        // The like count will be updated when the stream refreshes
+        _likeCounts[post.id] = newCount;
       });
+
+      // Make the actual API call in background
+      try {
+        await _mediaService.toggleLikePost(post.id);
+        // Success - keep the optimistic state
+      } catch (e) {
+        // Revert optimistic update on error
+        setState(() {
+          _likedPosts[post.id] = currentlyLiked;
+          _likeCounts[post.id] = currentCount;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('Failed to update like: ${e.toString().replaceFirst('Exception: ', '')}')),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } finally {
+        // Remove processing flag
+        _likedPosts.remove(post.id + '_processing');
+      }
 
     } catch (e) {
-      // Revert optimistic update on error
-      setState(() {
-        bool originalState = post.likes.contains(FirebaseAuth.instance.currentUser?.uid);
-        _likedPosts[post.id] = originalState;
-        _likeCounts[post.id] = post.likeCount;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Failed to update like: ${e.toString().replaceFirst('Exception: ', '')}')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
+      print('Error in _likePost: $e');
     }
   }
 
@@ -599,64 +612,76 @@ class _HomeFeedScreenState extends State<HomeFeedScreen> with TickerProviderStat
     try {
       HapticFeedback.lightImpact();
       
-      // Optimistically update UI
-      bool currentlySaved = _isPostSaved(post);
-      setState(() {
-        _savedPosts[post.id] = !currentlySaved;
-      });
-
-      // Make the actual API call
-      bool newSaveState = await _mediaService.toggleSavePost(post.id);
+      // Prevent multiple rapid taps
+      if (_savedPosts.containsKey(post.id + '_processing')) return;
       
-      // Update the state with the actual result
+      // Mark as processing
+      _savedPosts[post.id + '_processing'] = true;
+      
+      // Get current state and calculate new state
+      bool currentlySaved = _isPostSaved(post);
+      bool newSaveState = !currentlySaved;
+      
+      // Optimistically update UI (single setState)
       setState(() {
         _savedPosts[post.id] = newSaveState;
       });
 
-      // Show feedback to user
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(
-                  newSaveState ? Icons.bookmark : Icons.bookmark_border, 
-                  color: Colors.white,
-                ),
-                const SizedBox(width: 12),
-                Text(newSaveState ? 'Post saved! 📌' : 'Post removed from saved'),
-              ],
+      try {
+        // Make the actual API call
+        await _mediaService.toggleSavePost(post.id);
+        
+        // Show success feedback
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    newSaveState ? Icons.bookmark : Icons.bookmark_border, 
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(newSaveState ? 'Post saved! 📌' : 'Post removed from saved'),
+                ],
+              ),
+              backgroundColor: newSaveState ? const Color(0xFF6C5CE7) : Colors.grey,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(seconds: 1),
             ),
-            backgroundColor: newSaveState ? const Color(0xFF6C5CE7) : Colors.grey,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+          );
+        }
+      } catch (e) {
+        // Revert optimistic update on error
+        setState(() {
+          _savedPosts[post.id] = currentlySaved;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('Failed to save post: ${e.toString().replaceFirst('Exception: ', '')}')),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } finally {
+        // Remove processing flag
+        _savedPosts.remove(post.id + '_processing');
       }
 
     } catch (e) {
-      // Revert optimistic update on error
-      setState(() {
-        _savedPosts.remove(post.id);
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Failed to save post: ${e.toString().replaceFirst('Exception: ', '')}')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
+      print('Error in _savePost: $e');
     }
   }
 
