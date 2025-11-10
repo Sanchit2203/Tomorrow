@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import 'package:tomorrow/services/media_service.dart';
+import 'package:tomorrow/models/post_model.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -30,6 +31,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
   // Scheduling variables
   bool _isScheduled = false;
   DateTime? _scheduledDateTime;
+  String? _currentScheduledPostId; // Track scheduled post ID for deletion
   
   final List<String> _mediaOptions = [
     'Camera', 'Gallery', 'Video', 'Reel', 'Live'
@@ -171,6 +173,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
+                    color: Colors.black,
                   ),
                 ),
                 Text(
@@ -197,6 +200,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
         const SizedBox(height: 16),
@@ -272,6 +276,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
         ),
         const SizedBox(height: 16),
@@ -370,111 +375,6 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
               Icons.arrow_forward_ios_rounded,
               color: Colors.white.withOpacity(0.8),
               size: 16,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRecentMediaPreview() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Recent Photos',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                // Navigate to gallery
-              },
-              child: const Text(
-                'See All',
-                style: TextStyle(
-                  color: Color(0xFF6C5CE7),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 120,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: 8,
-            itemBuilder: (context, index) => _buildRecentMediaItem(index),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecentMediaItem(int index) {
-    final gradients = [
-      [const Color(0xFF6C5CE7), const Color(0xFFA8E6CF)],
-      [const Color(0xFFFF6B6B), const Color(0xFF4ECDC4)],
-      [const Color(0xFF45B7D1), const Color(0xFF96CEB4)],
-      [const Color(0xFFFECEA8), const Color(0xFFFFC3A0)],
-    ];
-    
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        _selectRecentMedia(index);
-      },
-      child: Container(
-        width: 100,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradients[index % gradients.length],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: gradients[index % gradients.length].first.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            const Center(
-              child: Icon(
-                Icons.image_rounded,
-                size: 40,
-                color: Colors.white,
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  size: 14,
-                  color: Colors.white,
-                ),
-              ),
             ),
           ],
         ),
@@ -665,16 +565,6 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
     );
   }
 
-  void _selectRecentMedia(int index) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Selected recent photo ${index + 1} 📸'),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
-
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -738,7 +628,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                       ),
                     ),
                     IconButton(
-                      onPressed: _isLoading ? null : () => Navigator.pop(context),
+                      onPressed: _isLoading ? null : () => _handleDialogClose(),
                       icon: Icon(
                         Icons.close, 
                         color: _isLoading ? Colors.grey.shade400 : Colors.grey,
@@ -828,6 +718,10 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                             expands: true,
                             textAlignVertical: TextAlignVertical.top,
                             enabled: !_isLoading,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               hintText: 'Write a caption...',
                               hintStyle: TextStyle(color: Colors.grey[600]),
@@ -851,6 +745,10 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                         TextField(
                           controller: _locationController,
                           enabled: !_isLoading,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Add location (optional)',
                             hintStyle: TextStyle(color: Colors.grey[600]),
@@ -887,6 +785,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                                 style: TextStyle(
                                   fontSize: 16, 
                                   color: _isLoading ? Colors.grey.shade400 : Colors.black,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                               Switch(
@@ -957,7 +856,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                                   'Schedule your post to appear in the future',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: _isLoading ? Colors.grey.shade400 : Colors.grey[600],
+                                    color: _isLoading ? Colors.grey.shade400 : Colors.black87,
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -989,7 +888,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
                                               fontSize: 14,
                                               color: _scheduledDateTime != null 
                                                   ? (_isLoading ? Colors.grey.shade500 : Colors.black)
-                                                  : Colors.grey[600],
+                                                  : (_isLoading ? Colors.grey.shade400 : Colors.grey[600]),
                                             ),
                                           ),
                                         ),
@@ -1091,7 +990,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
     try {
       if (_isScheduled && _scheduledDateTime != null) {
         // Create scheduled post
-        await _mediaService.createScheduledPost(
+        PostModel scheduledPost = await _mediaService.createScheduledPost(
           content: _captionController.text,
           scheduledAt: _scheduledDateTime!,
           images: _selectedImages.isNotEmpty ? _selectedImages : null,
@@ -1099,6 +998,9 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
           location: _locationController.text,
           isPublic: _isPublic,
         );
+        
+        // Store the scheduled post ID for potential cancellation
+        _currentScheduledPostId = scheduledPost.id;
       } else {
         // Create regular post
         await _mediaService.createPost(
@@ -1122,6 +1024,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
           _isLoading = false;
           _isScheduled = false;
           _scheduledDateTime = null;
+          _currentScheduledPostId = null; // Clear scheduled post ID on success
         });
       } else {
         setState(() {
@@ -1130,6 +1033,7 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
           _isLoading = false;
           _isScheduled = false;
           _scheduledDateTime = null;
+          _currentScheduledPostId = null; // Clear scheduled post ID on success
         });
       }
 
@@ -1221,6 +1125,68 @@ class _AddPostScreenState extends State<AddPostScreen> with TickerProviderStateM
         });
       }
     }
+  }
+
+  void _handleDialogClose() async {
+    // If there's a scheduled post created but dialog is being closed without completion,
+    // show confirmation and delete the scheduled post automatically
+    if (_currentScheduledPostId != null) {
+      final bool? shouldCancel = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text(
+              'Cancel Time Capsule?',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: const Text(
+              'Your time capsule has been created but not finalized. Do you want to cancel and delete it?',
+              style: TextStyle(color: Colors.black87),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text(
+                  'Keep Editing',
+                  style: TextStyle(color: Color(0xFF6C5CE7)),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Cancel & Delete'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (shouldCancel == true) {
+        try {
+          await _mediaService.deletePost(_currentScheduledPostId!);
+          print('Deleted cancelled scheduled post: $_currentScheduledPostId');
+          _currentScheduledPostId = null;
+          Navigator.pop(context);
+          _showSuccessSnackBar('Time capsule cancelled and deleted');
+        } catch (e) {
+          print('Error deleting cancelled scheduled post: $e');
+          _showErrorSnackBar('Failed to cancel time capsule: $e');
+        }
+      }
+      // If shouldCancel is false or null, don't close the dialog
+      return;
+    }
+    
+    // If no scheduled post or regular post, just close the dialog
+    Navigator.pop(context);
   }
 
   String _formatScheduledDate(DateTime dateTime) {
