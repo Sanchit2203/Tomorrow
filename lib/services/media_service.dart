@@ -252,7 +252,9 @@ class MediaService {
       // Update post status to published and increment user's post count
       await _firestore.collection(postsCollection).doc(postId).update({
         'postStatus': 'published',
-        'updatedAt': DateTime.now().toIso8601String(),
+        'isScheduled': false,
+        'scheduledAt': null,
+        'updatedAt': FieldValue.serverTimestamp(), // Mark as recently updated for sorting
       });
 
       // Update user's post count
@@ -439,12 +441,34 @@ class MediaService {
               // Check if this is a scheduled post that should be published now
               if (post.postStatus == 'scheduled' && 
                   post.isScheduled && 
-                  post.scheduledAt != null &&
-                  !post.scheduledAt!.isAfter(now)) {
+                  post.scheduledAt != null) {
                 
-                postsToAutoPublish.add(post.id);
-                // Update the post status in memory for immediate display
-                post = post.copyWith(postStatus: 'published');
+                // Check if the scheduled time has arrived (with minute precision)
+                final scheduledTime = DateTime(
+                  post.scheduledAt!.year,
+                  post.scheduledAt!.month,
+                  post.scheduledAt!.day,
+                  post.scheduledAt!.hour,
+                  post.scheduledAt!.minute,
+                );
+                final currentTime = DateTime(
+                  now.year,
+                  now.month,
+                  now.day,
+                  now.hour,
+                  now.minute,
+                );
+                
+                if (!scheduledTime.isAfter(currentTime)) {
+                  postsToAutoPublish.add(post.id);
+                  // Update the post status in memory for immediate display with current timestamp
+                  post = post.copyWith(
+                    postStatus: 'published',
+                    isScheduled: false,
+                    scheduledAt: null,
+                    updatedAt: now, // Set updated time to NOW for correct sorting
+                  );
+                }
               }
               
               posts.add(post);
@@ -458,6 +482,23 @@ class MediaService {
           if (postsToAutoPublish.isNotEmpty) {
             _autoPublishPostsBackground(postsToAutoPublish, userId);
           }
+          
+          // Sort by relevance: recently updated (published) posts first, then by creation date
+          posts.sort((a, b) {
+            // If post was recently updated (scheduled post just published), prioritize it
+            if (a.postStatus == 'published' && b.postStatus == 'published') {
+              // Compare by the more recent timestamp (updatedAt for freshly published, createdAt for regular)
+              DateTime aTime = a.updatedAt.isAfter(a.createdAt.add(Duration(minutes: 1))) 
+                  ? a.updatedAt // Recently updated (likely just published from schedule)
+                  : a.createdAt; // Regular post
+              DateTime bTime = b.updatedAt.isAfter(b.createdAt.add(Duration(minutes: 1)))
+                  ? b.updatedAt // Recently updated (likely just published from schedule) 
+                  : b.createdAt; // Regular post
+              return bTime.compareTo(aTime); // Most recent first
+            }
+            // Fallback to creation date for other cases
+            return b.createdAt.compareTo(a.createdAt);
+          });
           
           return posts;
         });
@@ -509,24 +550,50 @@ class MediaService {
               // Auto-publish scheduled posts that are ready (past their scheduled time)
               else if (post.postStatus == 'scheduled' && 
                        post.isScheduled && 
-                       post.scheduledAt != null &&
-                       !post.scheduledAt!.isAfter(now)) {
-                print('Auto-publishing scheduled post: ${post.id}');
-                try {
-                  // Auto-publish the scheduled post
-                  await _autoPublishScheduledPostInFeed(post.id);
-                  
-                  // Add the post as published to the feed
-                  final publishedPost = post.copyWith(
-                    postStatus: 'published',
-                    isScheduled: false,
-                    scheduledAt: null,
-                  );
-                  posts.add(publishedPost);
-                } catch (e) {
-                  print('Failed to auto-publish post ${post.id}: $e');
-                  // If auto-publish fails, still show the post as scheduled
-                  posts.add(post);
+                       post.scheduledAt != null) {
+                
+                // Check if the scheduled time has arrived (with minute precision)
+                final scheduledTime = DateTime(
+                  post.scheduledAt!.year,
+                  post.scheduledAt!.month,
+                  post.scheduledAt!.day,
+                  post.scheduledAt!.hour,
+                  post.scheduledAt!.minute,
+                );
+                final currentTime = DateTime(
+                  now.year,
+                  now.month,
+                  now.day,
+                  now.hour,
+                  now.minute,
+                );
+                
+                print('Checking scheduled post ${post.id}:');
+                print('  Scheduled time: ${scheduledTime.toString()}');
+                print('  Current time: ${currentTime.toString()}');
+                print('  Should publish: ${!scheduledTime.isAfter(currentTime)}');
+                
+                if (!scheduledTime.isAfter(currentTime)) {
+                  print('Auto-publishing scheduled post: ${post.id}');
+                  try {
+                    // Auto-publish the scheduled post
+                    await _autoPublishScheduledPostInFeed(post.id);
+                    
+                    // Add the post as published to the feed with current timestamp
+                    final publishedPost = post.copyWith(
+                      postStatus: 'published',
+                      isScheduled: false,
+                      scheduledAt: null,
+                      updatedAt: now, // Set updated time to NOW for correct sorting
+                    );
+                    posts.add(publishedPost);
+                  } catch (e) {
+                    print('Failed to auto-publish post ${post.id}: $e');
+                    // If auto-publish fails, still show the post as scheduled
+                    posts.add(post);
+                  }
+                } else {
+                  print('Scheduled post ${post.id} not ready yet - skipping');
                 }
               }
             } catch (e) {
@@ -535,8 +602,22 @@ class MediaService {
             }
           }
           
-          // Sort by creation date and limit results
-          posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          // Sort by relevance: recently updated (published) posts first, then by creation date
+          posts.sort((a, b) {
+            // If post was recently updated (scheduled post just published), prioritize it
+            if (a.postStatus == 'published' && b.postStatus == 'published') {
+              // Compare by the more recent timestamp (updatedAt for freshly published, createdAt for regular)
+              DateTime aTime = a.updatedAt.isAfter(a.createdAt.add(Duration(minutes: 1))) 
+                  ? a.updatedAt // Recently updated (likely just published from schedule)
+                  : a.createdAt; // Regular post
+              DateTime bTime = b.updatedAt.isAfter(b.createdAt.add(Duration(minutes: 1)))
+                  ? b.updatedAt // Recently updated (likely just published from schedule) 
+                  : b.createdAt; // Regular post
+              return bTime.compareTo(aTime); // Most recent first
+            }
+            // Fallback to creation date for other cases
+            return b.createdAt.compareTo(a.createdAt);
+          });
           print('Returning ${posts.length} posts');
           return posts.take(limit).toList();
         });
@@ -559,7 +640,7 @@ class MediaService {
         'postStatus': 'published',
         'isScheduled': false,
         'scheduledAt': null,
-        'publishedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(), // Mark as recently updated for sorting
       });
 
       // Increment user's post count
