@@ -32,12 +32,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _usernameController = TextEditingController(text: widget.user.username);
     _bioController = TextEditingController(text: widget.user.bio);
     
-    // Add listener to check username availability
     _usernameController.addListener(_checkUsernameAvailability);
   }
 
   @override
   void dispose() {
+    _usernameController.removeListener(_checkUsernameAvailability);
     _displayNameController.dispose();
     _usernameController.dispose();
     _bioController.dispose();
@@ -48,66 +48,77 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final username = _usernameController.text.trim();
     
     if (username.isEmpty || username == widget.user.username) {
-      setState(() {
-        _usernameError = null;
-        _isCheckingUsername = false;
-      });
+      if (mounted) {
+        setState(() {
+          _usernameError = null;
+          _isCheckingUsername = false;
+        });
+      }
       return;
     }
 
-    setState(() {
-      _isCheckingUsername = true;
-      _usernameError = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isCheckingUsername = true;
+        _usernameError = null;
+      });
+    }
 
-    // Add a small delay to avoid too many requests
     await Future.delayed(const Duration(milliseconds: 500));
 
-    if (username != _usernameController.text.trim()) {
-      // User has typed more characters, skip this check
+    if (!mounted || username != _usernameController.text.trim()) {
       return;
     }
 
     try {
       final validationMessage = ProfileService.getUsernameValidationMessage(username);
       if (validationMessage != null) {
-        setState(() {
-          _usernameError = validationMessage;
-          _isCheckingUsername = false;
-        });
+        if (mounted) {
+          setState(() {
+            _usernameError = validationMessage;
+            _isCheckingUsername = false;
+          });
+        }
         return;
       }
 
-      // Check availability with database
       final userData = await _profileService.getUserByUsername(username);
-      setState(() {
-        _usernameError = userData != null ? 'Username is already taken' : null;
-        _isCheckingUsername = false;
-      });
+      if (mounted) {
+        setState(() {
+          _usernameError = userData != null ? 'Username is already taken' : null;
+          _isCheckingUsername = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _usernameError = 'Error checking username availability';
-        _isCheckingUsername = false;
-      });
+      if (mounted) {
+        setState(() {
+          _usernameError = 'Error checking username availability';
+          _isCheckingUsername = false;
+        });
+      }
     }
   }
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
     if (_usernameError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_usernameError!),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fix the errors before saving.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       await _profileService.updateProfile(
@@ -147,20 +158,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: isDarkMode ? Colors.black : Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Edit Profile',
           style: TextStyle(
-            color: Colors.black,
+            color: isDarkMode ? Colors.white : Colors.black,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: IconThemeData(color: isDarkMode ? Colors.white : Colors.black),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveProfile,
@@ -191,7 +204,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Image Section
               Center(
                 child: GestureDetector(
                   onTap: () => _showImageOptions(context),
@@ -203,7 +215,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF6C5CE7).withValues(alpha: 0.3),
+                          color: const Color(0xFF6C5CE7).withOpacity(0.3),
                           blurRadius: 20,
                           offset: const Offset(0, 8),
                         ),
@@ -211,9 +223,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     child: Container(
                       margin: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white,
+                        color: isDarkMode ? Colors.black : Colors.white,
                       ),
                       child: Stack(
                         children: [
@@ -224,7 +236,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ? NetworkImage(widget.user.profileImageUrl) 
                               : null,
                             child: widget.user.profileImageUrl.isEmpty 
-                              ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                              ? Icon(Icons.person, size: 50, color: Colors.grey[400])
                               : null,
                           ),
                           Positioned(
@@ -252,11 +264,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               
               const SizedBox(height: 40),
               
-              // Display Name Field
               _buildTextField(
                 controller: _displayNameController,
                 label: 'Display Name',
                 hint: 'Enter your display name',
+                isDarkMode: isDarkMode,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Display name cannot be empty';
@@ -270,12 +282,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               
               const SizedBox(height: 20),
               
-              // Username Field
               _buildTextField(
                 controller: _usernameController,
                 label: 'Username',
                 hint: 'Choose a unique username',
                 prefix: '@',
+                isDarkMode: isDarkMode,
                 suffix: _isCheckingUsername
                     ? const SizedBox(
                         width: 20,
@@ -296,12 +308,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               
               const SizedBox(height: 20),
               
-              // Bio Field
               _buildTextField(
                 controller: _bioController,
                 label: 'Bio',
                 hint: 'Tell people about yourself',
                 maxLines: 4,
+                isDarkMode: isDarkMode,
                 validator: (value) {
                   if (value != null && value.length > 150) {
                     return 'Bio must be less than 150 characters';
@@ -312,7 +324,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               
               const SizedBox(height: 40),
               
-              // Additional Info
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -338,12 +349,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '• Choose a unique username to help people find you\n'
-                      '• Add a bio to tell people about yourself\n'
-                      '• Upload a profile picture to personalize your account',
+                      '• Choose a unique username to help people find you.\n'
+                      '• Add a bio to tell people about yourself.\n'
+                      '• Upload a profile picture to personalize your account.',
                       style: TextStyle(
                         color: Colors.blue[600],
                         fontSize: 14,
+                        height: 1.5,
                       ),
                     ),
                   ],
@@ -360,6 +372,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required TextEditingController controller,
     required String label,
     required String hint,
+    required bool isDarkMode,
     String? prefix,
     Widget? suffix,
     String? Function(String?)? validator,
@@ -371,46 +384,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
-            color: Colors.black87,
+            color: isDarkMode ? Colors.white70 : Colors.black87,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDarkMode ? Colors.grey[900] : Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: errorText != null ? Colors.red : Colors.grey[300]!,
+              color: errorText != null ? Colors.red : (isDarkMode ? Colors.grey[700]! : Colors.grey[300]!),
             ),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
+              if (!isDarkMode)
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
             ],
           ),
           child: TextFormField(
             controller: controller,
             maxLines: maxLines,
             validator: validator,
-            style: const TextStyle(fontSize: 16),
+            style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white : Colors.black),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(color: Colors.grey[500]),
+              hintStyle: TextStyle(color: isDarkMode ? Colors.grey[600] : Colors.grey[500]),
               prefixText: prefix,
-              prefixStyle: const TextStyle(
-                color: Colors.black87,
+              prefixStyle: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.black87,
                 fontWeight: FontWeight.w500,
+                fontSize: 16,
               ),
               suffixIcon: suffix,
               border: InputBorder.none,
               contentPadding: const EdgeInsets.all(16),
               errorText: errorText,
-              errorStyle: const TextStyle(color: Colors.red),
+              errorStyle: const TextStyle(color: Colors.red, height: 0),
             ),
           ),
         ),
@@ -419,8 +434,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   void _showImageOptions(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -430,16 +447,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text('Take Photo'),
+              leading: Icon(Icons.photo_camera, color: isDarkMode ? Colors.white70 : Colors.black),
+              title: Text('Take Photo', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               onTap: () {
                 Navigator.pop(context);
                 _updateProfileImage(ImageSource.camera);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
+              leading: Icon(Icons.photo_library, color: isDarkMode ? Colors.white70 : Colors.black),
+              title: Text('Choose from Gallery', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
               onTap: () {
                 Navigator.pop(context);
                 _updateProfileImage(ImageSource.gallery);
@@ -462,11 +479,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _updateProfileImage(ImageSource source) async {
     try {
-      String? imageUrl = await ProfileService().updateProfileImage(source: source);
+      String? imageUrl = await _profileService.updateProfileImage(source: source);
       if (imageUrl != null && mounted) {
-        setState(() {
-          // Update the local user data for immediate UI update
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profile image updated successfully!'),
@@ -490,14 +504,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _removeProfileImage() async {
     try {
-      await ProfileService().removeProfileImage();
+      await _profileService.removeProfileImage();
       if (mounted) {
-        setState(() {
-          // Update the local user data for immediate UI update
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Profile image removed'),
+            content: Text('Profile image removed successfully!'),
             backgroundColor: Color(0xFF00C851),
             behavior: SnackBarBehavior.floating,
           ),
