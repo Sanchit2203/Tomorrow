@@ -10,6 +10,7 @@ import 'package:tomorrow/models/post_model.dart';
 import 'package:tomorrow/edit_profile_screen.dart';
 import 'package:tomorrow/test_firebase_screen.dart';
 import 'package:tomorrow/create_post_screen.dart';
+import 'package:tomorrow/firebase_debug_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -1096,6 +1097,19 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 );
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.settings_applications),
+              title: const Text('Firebase Debug'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FirebaseDebugScreen(),
+                  ),
+                );
+              },
+            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
@@ -1591,26 +1605,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  String _formatScheduleTime(DateTime scheduledAt) {
-    final now = DateTime.now();
-    final difference = scheduledAt.difference(now);
 
-    if (difference.inDays > 30) {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${months[scheduledAt.month - 1]} ${scheduledAt.day}';
-    } else if (difference.inDays > 1) {
-      return '${difference.inDays}d';
-    } else if (difference.inDays == 1) {
-      return '1d';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}m';
-    } else {
-      return 'Now';
-    }
-  }
 
   void _showScheduledPostDetails(PostModel post) {
     showModalBottomSheet(
